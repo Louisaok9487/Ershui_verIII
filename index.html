@@ -1,0 +1,3149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>臺灣道教宮觀・天界棋 — 3D 閩南神將象棋</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --gold: #f5c85b;
+      --cinnabar: #9e1f1b;
+      --obsidian: #120b09;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #0d0706;
+      font-family: 'Noto Serif TC', 'Inter', serif;
+      color: #f9eed8;
+    }
+    #canvas-wrap {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      z-index: 1;
+    }
+    .temple-glass {
+      background: linear-gradient(180deg, rgba(28, 14, 11, 0.88) 0%, rgba(16, 9, 8, 0.92) 100%);
+      border: 1px solid rgba(245, 200, 91, 0.38);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 226, 150, 0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .gold-btn {
+      background: linear-gradient(180deg, rgba(62, 26, 18, 0.92) 0%, rgba(34, 14, 10, 0.95) 100%);
+      border: 1px solid rgba(245, 200, 91, 0.42);
+      color: #fae8be;
+      transition: transform 0.14s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+    .gold-btn:hover {
+      border-color: rgba(255, 219, 125, 0.85);
+      background: linear-gradient(180deg, rgba(96, 36, 22, 0.95) 0%, rgba(50, 18, 12, 0.98) 100%);
+    }
+    .gold-btn:active {
+      transform: scale(0.94);
+    }
+    .gold-btn-primary {
+      background: linear-gradient(180deg, #b8291f 0%, #7d1510 100%);
+      border: 1px solid #f7cf6d;
+      color: #fff6dc;
+      box-shadow: 0 0 14px rgba(230, 82, 44, 0.45);
+    }
+    @keyframes talismanPulse {
+      0%, 100% { transform: scale(1); opacity: 0.96; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    .check-banner-anim {
+      animation: talismanPulse 0.85s ease-in-out infinite;
+    }
+    .safe-top {
+      padding-top: max(0.5rem, env(safe-area-inset-top));
+    }
+    .safe-bottom {
+      padding-bottom: max(0.6rem, env(safe-area-inset-bottom));
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D WebGL 閩南宮殿場景 -->
+  <div id="canvas-wrap"></div>
+
+  <!-- 頂部宮廟狀態列 -->
+  <header class="fixed top-0 left-0 right-0 z-20 pointer-events-none px-2.5 sm:px-4 safe-top">
+    <div class="max-w-4xl mx-auto flex flex-col gap-1.5">
+      <div class="temple-glass rounded-xl px-3 py-2 flex items-center justify-between gap-2 pointer-events-auto">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-red-900/70 border border-amber-400/60 flex items-center justify-center shrink-0 text-amber-300 font-black text-base sm:text-lg shadow-inner">
+            敕
+          </div>
+          <div class="min-w-0">
+            <h1 class="text-xs sm:text-base font-black tracking-wider text-amber-200 truncate">
+              臺灣道教宮觀・天界棋
+            </h1>
+            <div class="flex items-center gap-1.5 text-[11px] sm:text-xs">
+              <span id="turn-dot" class="inline-block w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></span>
+              <span id="turn-label" class="text-amber-100/90 font-semibold truncate">陽界鎏金方・請起手</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="btn-sound" type="button" class="gold-btn rounded-lg px-2.5 py-1.5 text-xs font-bold flex items-center gap-1" title="宮廟音效開關">
+            <span id="sound-icon">🔊</span>
+            <span class="hidden sm:inline">法音</span>
+          </button>
+          <button id="btn-lore" type="button" class="gold-btn rounded-lg px-2.5 py-1.5 text-xs font-bold flex items-center gap-1" title="八將與天兵神祇圖鑑">
+            <span>📜</span>
+            <span class="hidden sm:inline">神將譜</span>
+          </button>
+          <button id="btn-settings" type="button" class="gold-btn rounded-lg px-2.5 py-1.5 text-xs font-bold flex items-center gap-1" title="道長AI境界與設局">
+            <span>☯️</span>
+            <span id="ai-badge-short" class="text-[11px] sm:text-xs">護法道長</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 動態道長 AI 對話與戰況列 -->
+      <div class="temple-glass rounded-xl px-3 py-1.5 flex items-center justify-between gap-2 pointer-events-auto">
+        <div class="flex items-center gap-2 min-w-0">
+          <span id="daoist-state-icon" class="text-base sm:text-lg shrink-0">🧙‍♂️</span>
+          <p id="daoist-speech" class="text-[11px] sm:text-xs text-amber-100/95 truncate">
+            「香煙通三界，雕龍鎮乾坤。施主執鎏金神將，請賜教！」
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 text-[11px] font-semibold border-l border-amber-500/30 pl-2">
+          <span class="text-amber-300" title="已擊碎道長石雕棋子">破石:<b id="score-red" class="ml-0.5">0</b></span>
+          <span class="text-stone-300" title="已折損我方鎏金木棋">損金:<b id="score-black" class="ml-0.5">0</b></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 中央敕令橫幅（將軍／破陣／絕殺時浮現，不阻擋點擊） -->
+  <div id="center-callout" class="fixed top-28 sm:top-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-opacity duration-300">
+    <div id="callout-box" class="px-5 py-2 rounded-full bg-gradient-to-r from-red-950/90 via-red-800/95 to-red-950/90 border-2 border-amber-300 shadow-[0_0_30px_rgba(245,158,11,0.75)] text-amber-200 font-black tracking-widest text-sm sm:text-lg whitespace-nowrap check-banner-anim">
+      ⚡ 急急如律令・將軍！
+    </div>
+  </div>
+
+  <!-- 底部手機單手操作列 -->
+  <footer class="fixed bottom-0 left-0 right-0 z-20 pointer-events-none px-2.5 sm:px-4 safe-bottom">
+    <div class="max-w-xl mx-auto flex flex-col items-center gap-1.5">
+      <div id="selected-piece-hint" class="text-[11px] text-amber-200/90 bg-black/65 border border-amber-500/30 px-3 py-0.5 rounded-full backdrop-blur-sm">
+        單指點選神將落子・拖曳旋轉殿堂・雙指縮放
+      </div>
+      <div class="w-full temple-glass rounded-2xl p-1.5 grid grid-cols-4 gap-1.5 pointer-events-auto">
+        <button id="btn-cam" type="button" class="gold-btn rounded-xl py-2 px-1.5 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[11px] sm:text-xs font-bold">
+          <span>🏯</span>
+          <span id="cam-label">殿堂視角</span>
+        </button>
+        <button id="btn-hint" type="button" class="gold-btn rounded-xl py-2 px-1.5 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[11px] sm:text-xs font-bold">
+          <span>🔮</span>
+          <span>靈籤指點</span>
+        </button>
+        <button id="btn-undo" type="button" class="gold-btn rounded-xl py-2 px-1.5 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[11px] sm:text-xs font-bold">
+          <span>↩️</span>
+          <span>乾坤悔棋</span>
+        </button>
+        <button id="btn-restart" type="button" class="gold-btn gold-btn-primary rounded-xl py-2 px-1.5 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[11px] sm:text-xs font-bold">
+          <span>🔥</span>
+          <span>重開新局</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 神將與材質圖鑑 Modal -->
+  <div id="modal-lore" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="temple-glass rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-amber-500/30 flex items-center justify-between">
+        <h2 class="text-base sm:text-lg font-black text-amber-300 tracking-wide">📜 臺灣宮觀天界棋・神將與工藝譜</h2>
+        <button id="btn-close-lore" type="button" class="gold-btn w-8 h-8 rounded-lg font-bold text-sm">✕</button>
+      </div>
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-3 text-xs sm:text-sm leading-relaxed text-amber-50/90">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="p-3 rounded-xl bg-red-950/50 border border-amber-400/40">
+            <div class="font-black text-amber-300 mb-1">🔥 陽界玩家（朱漆鎏金木雕）</div>
+            <p class="text-xs text-amber-100/80">取樟木與紫檀精雕，外覆傳統宮廟「按金」24K鎏金甲冑。受擊破碎時迸裂為朱木金箔殘片。</p>
+          </div>
+          <div class="p-3 rounded-xl bg-stone-900/70 border border-emerald-400/30">
+            <div class="font-black text-emerald-300 mb-1">⛰️ 玄門道長（精雕青斗石材）</div>
+            <p class="text-xs text-stone-200/80">取閩南殿堂龍柱同源之青斗石與墨玉雕琢，沉穩古樸。破碎時崩裂為青石碎塊並揚起香灰與紙錢餘燼。</p>
+          </div>
+        </div>
+        <div class="space-y-2 pt-1">
+          <div class="font-bold text-amber-300 border-b border-amber-500/25 pb-1">⚔️ 「八將」與「天兵」棋制對照</div>
+          <div class="grid grid-cols-1 gap-1.5 text-xs">
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">帥 / 將</span><span>中壇元帥（太子爺） ／ 北極玄天上帝（背光法輪）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">仕 / 士</span><span>八將護法・甘柳將軍（雙翎羽冠、羽扇板批）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">相 / 象</span><span>八將捉拿・謝范將軍（七爺八爺高帽護印，不過界河）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">傌 / 馬</span><span>八將先鋒・枷鎖將軍神騎（騰雲天馬，留心拐馬腳）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">俥 / 車</span><span>四季大神・風火戰輦（雙輪烈焰戰車，縱橫無阻）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">炮 / 包</span><span>九天雷祖・神威雷火銃（隔山打牛，五雷符咒轟擊）</span></div>
+            <div class="flex justify-between bg-white/5 px-3 py-1.5 rounded-lg"><span class="font-bold text-amber-200">兵 / 卒</span><span>護殿天兵 ／ 玄門鬼卒（兜鍪長戈，過河橫行）</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-amber-500/30 flex justify-end">
+        <button id="btn-ok-lore" type="button" class="gold-btn gold-btn-primary px-5 py-2 rounded-xl text-xs font-bold">領旨回殿</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 道長 AI 境界與設局 Modal -->
+  <div id="modal-settings" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="temple-glass rounded-2xl max-w-md w-full overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-amber-500/30 flex items-center justify-between">
+        <h2 class="text-base sm:text-lg font-black text-amber-300">☯️ 玄門道長 AI 與殿堂設局</h2>
+        <button id="btn-close-settings" type="button" class="gold-btn w-8 h-8 rounded-lg font-bold text-sm">✕</button>
+      </div>
+      <div class="p-5 space-y-4 text-xs sm:text-sm">
+        <div>
+          <div class="font-bold text-amber-200 mb-2">選擇單人道長 AI 道行境界：</div>
+          <div class="grid grid-cols-3 gap-2">
+            <button id="diff-1" type="button" data-diff="1" class="gold-btn rounded-xl p-2.5 text-center flex flex-col items-center gap-1">
+              <span class="text-base">🧒</span>
+              <span class="font-bold">小道童</span>
+              <span class="text-[10px] text-amber-200/70">入門試煉</span>
+            </button>
+            <button id="diff-2" type="button" data-diff="2" class="gold-btn gold-btn-primary rounded-xl p-2.5 text-center flex flex-col items-center gap-1">
+              <span class="text-base">🧙‍♂️</span>
+              <span class="font-bold">護法道長</span>
+              <span class="text-[10px] text-amber-100/80">進階佈陣</span>
+            </button>
+            <button id="diff-3" type="button" data-diff="3" class="gold-btn rounded-xl p-2.5 text-center flex flex-col items-center gap-1">
+              <span class="text-base">⚡</span>
+              <span class="font-bold">天師真人</span>
+              <span class="text-[10px] text-amber-200/70">深算殺著</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="font-bold text-amber-200 mb-2">開局陣法選擇：</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="mode-standard" type="button" class="gold-btn gold-btn-primary rounded-xl py-2.5 px-3 font-bold text-xs">
+              🏯 標準天界全陣
+            </button>
+            <button id="mode-clash" type="button" class="gold-btn rounded-xl py-2.5 px-3 font-bold text-xs">
+              ⚔️ 八將破陣殘局（激戰）
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-white/5 px-3.5 py-2.5 rounded-xl border border-amber-500/20">
+          <div>
+            <div class="font-bold text-amber-200">神將頭頂懸浮棋字靈印</div>
+            <div class="text-[11px] text-amber-100/70">方便手機小螢幕一眼辨識帥仕相傌俥炮兵</div>
+          </div>
+          <button id="btn-toggle-badges" type="button" class="gold-btn gold-btn-primary px-3 py-1.5 rounded-lg font-bold text-xs shrink-0">
+            已開啟
+          </button>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-amber-500/30 flex justify-end">
+        <button id="btn-ok-settings" type="button" class="gold-btn gold-btn-primary px-5 py-2 rounded-xl text-xs font-bold">完成設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 勝負結算 Modal -->
+  <div id="modal-gameover" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div class="temple-glass rounded-2xl max-w-sm w-full p-6 text-center space-y-4 border-2 border-amber-400/70">
+      <div id="gameover-icon" class="text-5xl">🏆</div>
+      <h2 id="gameover-title" class="text-2xl font-black text-amber-300 tracking-wider">天界大捷・敕封元帥</h2>
+      <p id="gameover-desc" class="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
+        施主神機妙算，鎏金八將破盡玄門石陣！道長稽首拜服。
+      </p>
+      <div class="pt-2 flex gap-2.5 justify-center">
+        <button id="btn-gameover-review" type="button" class="gold-btn px-4 py-2.5 rounded-xl text-xs font-bold">
+          觀賞殿堂棋局
+        </button>
+        <button id="btn-gameover-restart" type="button" class="gold-btn gold-btn-primary px-5 py-2.5 rounded-xl text-xs font-bold">
+          再啟天界新局
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* =========================================================
+       * 1. 音效合成器 (Web Audio API — 宮廟鐘磬、木魚、五雷符咒、石木碎裂)
+       * ========================================================= */
+      const SoundFX = {
+        ctx: null,
+        enabled: true,
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        },
+        playSelect() {
+          if (!this.enabled) return;
+          this.init();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(640, t);
+          osc.frequency.exponentialRampToValueAtTime(420, t + 0.08);
+          gain.gain.setValueAtTime(0.22, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.095);
+        },
+        playMove(isStone) {
+          if (!this.enabled) return;
+          this.init();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = isStone ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(isStone ? 190 : 280, t);
+          osc.frequency.exponentialRampToValueAtTime(58, t + 0.14);
+          gain.gain.setValueAtTime(0.35, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.16);
+        },
+        playTalismanCast() {
+          if (!this.enabled) return;
+          this.init();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, t);
+          osc.frequency.exponentialRampToValueAtTime(1280, t + 0.28);
+          gain.gain.setValueAtTime(0.01, t);
+          gain.gain.linearRampToValueAtTime(0.16, t + 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.38);
+        },
+        playShatter(isVictimStone) {
+          if (!this.enabled) return;
+          this.init();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          // 低頻雷震重擊
+          const sub = this.ctx.createOscillator();
+          const subGain = this.ctx.createGain();
+          sub.type = 'sawtooth';
+          sub.frequency.setValueAtTime(125, t);
+          sub.frequency.exponentialRampToValueAtTime(32, t + 0.42);
+          subGain.gain.setValueAtTime(0.42, t);
+          subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+          sub.connect(subGain);
+          subGain.connect(this.ctx.destination);
+          sub.start(t);
+          sub.stop(t + 0.46);
+
+          // 碎石 / 裂木顆粒噪音模擬
+          const bufferSize = Math.floor(this.ctx.sampleRate * 0.45);
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            const env = Math.pow(1 - i / bufferSize, 1.8);
+            const crackle = (i % 180 < 25) ? 1.5 : 0.55;
+            data[i] = (Math.random() * 2 - 1) * env * crackle;
+          }
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(isVictimStone ? 1650 : 2350, t);
+          filter.Q.setValueAtTime(1.4, t);
+          const nGain = this.ctx.createGain();
+          nGain.gain.setValueAtTime(0.45, t);
+          nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+          noise.connect(filter);
+          filter.connect(nGain);
+          nGain.connect(this.ctx.destination);
+          noise.start(t);
+        },
+        playTempleBell() {
+          if (!this.enabled) return;
+          this.init();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          [440, 660, 885, 1180].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.16 / (idx + 1), t);
+            gain.gain.exponentialRampToValueAtTime(0.0008, t + 1.5 - idx * 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 1.55);
+          });
+        }
+      };
+
+      /* =========================================================
+       * 2. 象棋神將資料定義與程序化材質貼圖生成
+       * ========================================================= */
+      const PIECE_META = {
+        K: { kanji: '帥', deity: '中壇元帥', side: 'red', role: 'king', val: 10000 },
+        A: { kanji: '仕', deity: '甘柳將軍', side: 'red', role: 'advisor', val: 210 },
+        B: { kanji: '相', deity: '謝范將軍', side: 'red', role: 'elephant', val: 210 },
+        N: { kanji: '傌', deity: '枷鎖神騎', side: 'red', role: 'horse', val: 430 },
+        R: { kanji: '俥', deity: '四季戰輦', side: 'red', role: 'chariot', val: 920 },
+        C: { kanji: '炮', deity: '九天雷銃', side: 'red', role: 'cannon', val: 470 },
+        P: { kanji: '兵', deity: '護殿天兵', side: 'red', role: 'pawn', val: 110 },
+
+        k: { kanji: '將', deity: '玄天上帝', side: 'black', role: 'king', val: 10000 },
+        a: { kanji: '士', deity: '文武判官', side: 'black', role: 'advisor', val: 210 },
+        b: { kanji: '象', deity: '七爺八爺', side: 'black', role: 'elephant', val: 210 },
+        n: { kanji: '馬', deity: '玄壇黑虎', side: 'black', role: 'horse', val: 430 },
+        r: { kanji: '車', deity: '黑令戰車', side: 'black', role: 'chariot', val: 920 },
+        c: { kanji: '包', deity: '五雷法砲', side: 'black', role: 'cannon', val: 470 },
+        p: { kanji: '卒', deity: '玄門天兵', side: 'black', role: 'pawn', val: 110 }
+      };
+
+      const CELL = 1.05;
+      const BOARD_Y = 0.24;
+      const PLANE_W = 9.8;
+      const PLANE_H = 10.85;
+
+      function colToX(c) { return (c - 4) * CELL; }
+      function rowToZ(r) { return (r - 4.5) * CELL; }
+
+      function createBoardTexture() {
+        const scale = 180;
+        const W = Math.round(PLANE_W * scale);
+        const H = Math.round(PLANE_H * scale);
+        const margin = Math.round(0.7 * scale);
+        const step = Math.round(CELL * scale);
+
+        const cvs = document.createElement('canvas');
+        cvs.width = W;
+        cvs.height = H;
+        const ctx = cvs.getContext('2d');
+
+        const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+        bgGrad.addColorStop(0, '#2a110b');
+        bgGrad.addColorStop(0.5, '#38170f');
+        bgGrad.addColorStop(1, '#230d08');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.strokeStyle = 'rgba(18, 6, 3, 0.32)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 160; i++) {
+          const y = (i / 160) * H;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.bezierCurveTo(W * 0.33, y + Math.sin(i) * 14, W * 0.66, y - Math.cos(i) * 14, W, y + 4);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#d9a441';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(36, 36, W - 72, H - 72);
+        ctx.strokeStyle = 'rgba(245, 204, 106, 0.55)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(52, 52, W - 104, H - 104);
+
+        const riverTop = margin + 4 * step;
+        const riverGrad = ctx.createLinearGradient(margin, riverTop, margin + 8 * step, riverTop + step);
+        riverGrad.addColorStop(0, 'rgba(20, 10, 8, 0.65)');
+        riverGrad.addColorStop(0.5, 'rgba(65, 24, 14, 0.55)');
+        riverGrad.addColorStop(1, 'rgba(20, 10, 8, 0.65)');
+        ctx.fillStyle = riverGrad;
+        ctx.fillRect(margin, riverTop, 8 * step, step);
+
+        function drawBaguaWatermark(cx, cy, radius) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.strokeStyle = 'rgba(245, 198, 92, 0.22)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const ang = (i * Math.PI) / 4 + Math.PI / 8;
+            const px = Math.cos(ang) * radius;
+            const py = Math.sin(ang) * radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+        drawBaguaWatermark(margin + 4 * step, margin + 1 * step, step * 0.92);
+        drawBaguaWatermark(margin + 4 * step, margin + 8 * step, step * 0.92);
+
+        ctx.strokeStyle = '#eab854';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(margin - 10, margin - 10, 8 * step + 20, 9 * step + 20);
+
+        for (let r = 0; r <= 9; r++) {
+          const y = margin + r * step;
+          ctx.beginPath();
+          ctx.moveTo(margin, y);
+          ctx.lineTo(margin + 8 * step, y);
+          ctx.stroke();
+        }
+
+        for (let c = 0; c <= 8; c++) {
+          const x = margin + c * step;
+          if (c === 0 || c === 8) {
+            ctx.beginPath();
+            ctx.moveTo(x, margin);
+            ctx.lineTo(x, margin + 9 * step);
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(x, margin);
+            ctx.lineTo(x, margin + 4 * step);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x, margin + 5 * step);
+            ctx.lineTo(x, margin + 9 * step);
+            ctx.stroke();
+          }
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(margin + 3 * step, margin);
+        ctx.lineTo(margin + 5 * step, margin + 2 * step);
+        ctx.moveTo(margin + 5 * step, margin);
+        ctx.lineTo(margin + 3 * step, margin + 2 * step);
+
+        ctx.moveTo(margin + 3 * step, margin + 7 * step);
+        ctx.lineTo(margin + 5 * step, margin + 9 * step);
+        ctx.moveTo(margin + 5 * step, margin + 7 * step);
+        ctx.lineTo(margin + 3 * step, margin + 9 * step);
+        ctx.stroke();
+
+        function drawFiducial(c, r) {
+          const cx = margin + c * step;
+          const cy = margin + r * step;
+          const d = 14;
+          const l = 34;
+          ctx.lineWidth = 4;
+          const dirs = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+          dirs.forEach(([dx, dy]) => {
+            if (c === 0 && dx < 0) return;
+            if (c === 8 && dx > 0) return;
+            ctx.beginPath();
+            ctx.moveTo(cx + dx * d, cy + dy * (d + l));
+            ctx.lineTo(cx + dx * d, cy + dy * d);
+            ctx.lineTo(cx + dx * (d + l), cy + dy * d);
+            ctx.stroke();
+          });
+        }
+        [1, 7].forEach(c => { drawFiducial(c, 2); drawFiducial(c, 7); });
+        [0, 2, 4, 6, 8].forEach(c => { drawFiducial(c, 3); drawFiducial(c, 6); });
+
+        ctx.fillStyle = '#f5cb6c';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '900 72px "Noto Serif TC", serif';
+        ctx.fillText('楚河・天界', margin + 2 * step, riverTop + step * 0.5);
+        ctx.fillText('玄門・漢界', margin + 6 * step, riverTop + step * 0.5);
+
+        const tex = new THREE.CanvasTexture(cvs);
+        tex.anisotropy = 4;
+        return tex;
+      }
+
+      function createStoneTexture(darkTone) {
+        const cvs = document.createElement('canvas');
+        cvs.width = 256;
+        cvs.height = 256;
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle = darkTone ? '#26302d' : '#3a4642';
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 2200; i++) {
+          const x = Math.random() * 256;
+          const y = Math.random() * 256;
+          const sz = Math.random() * 2.8 + 0.6;
+          const v = Math.random();
+          ctx.fillStyle = v > 0.65 ? 'rgba(155, 178, 168, 0.24)' : (v < 0.3 ? 'rgba(14, 20, 18, 0.38)' : 'rgba(82, 104, 96, 0.22)');
+          ctx.fillRect(x, y, sz, sz);
+        }
+        ctx.strokeStyle = 'rgba(15, 22, 20, 0.35)';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 36; i++) {
+          ctx.beginPath();
+          const x = Math.random() * 256;
+          const y = Math.random() * 256;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + (Math.random() - 0.5) * 45, y + (Math.random() - 0.5) * 45);
+          ctx.stroke();
+        }
+        const tex = new THREE.CanvasTexture(cvs);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+      }
+
+      function createGildedWoodTexture() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 256;
+        cvs.height = 256;
+        const ctx = cvs.getContext('2d');
+        const g = ctx.createLinearGradient(0, 0, 256, 256);
+        g.addColorStop(0, '#6e1610');
+        g.addColorStop(0.5, '#8f2117');
+        g.addColorStop(1, '#540e09');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 70; i++) {
+          const y = (i / 70) * 256;
+          ctx.strokeStyle = i % 5 === 0 ? 'rgba(245, 198, 90, 0.25)' : 'rgba(32, 6, 4, 0.32)';
+          ctx.lineWidth = i % 5 === 0 ? 1.5 : 2.2;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.bezierCurveTo(85, y + 7, 170, y - 7, 256, y);
+          ctx.stroke();
+        }
+        const tex = new THREE.CanvasTexture(cvs);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+      }
+
+      const sealTexCache = {};
+      function getPieceSealTexture(code) {
+        if (sealTexCache[code]) return sealTexCache[code];
+        const info = PIECE_META[code];
+        const isRed = info.side === 'red';
+        const cvs = document.createElement('canvas');
+        cvs.width = 256;
+        cvs.height = 256;
+        const ctx = cvs.getContext('2d');
+
+        ctx.clearRect(0, 0, 256, 256);
+        ctx.beginPath();
+        ctx.arc(128, 128, 118, 0, Math.PI * 2);
+        const rad = ctx.createRadialGradient(128, 115, 12, 128, 128, 118);
+        if (isRed) {
+          rad.addColorStop(0, '#9c1e14');
+          rad.addColorStop(0.82, '#5c0e09');
+          rad.addColorStop(1, '#3d0805');
+        } else {
+          rad.addColorStop(0, '#2c3d38');
+          rad.addColorStop(0.82, '#182320');
+          rad.addColorStop(1, '#0e1513');
+        }
+        ctx.fillStyle = rad;
+        ctx.fill();
+
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = isRed ? '#fbcf65' : '#8fd9c4';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(128, 128, 100, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = isRed ? 'rgba(255, 224, 140, 0.65)' : 'rgba(165, 232, 212, 0.5)';
+        ctx.stroke();
+
+        ctx.fillStyle = isRed ? '#ffe494' : '#d5faf0';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 8;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '900 122px "Noto Serif TC", serif';
+        ctx.fillText(info.kanji, 128, 116);
+
+        ctx.font = '700 26px "Noto Serif TC", serif';
+        ctx.fillStyle = isRed ? '#f7c55f' : '#9ad9c7';
+        ctx.fillText(info.deity, 128, 194);
+
+        const tex = new THREE.CanvasTexture(cvs);
+        sealTexCache[code] = tex;
+        return tex;
+      }
+
+      function createTalismanTexture() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 128;
+        cvs.height = 320;
+        const ctx = cvs.getContext('2d');
+
+        const g = ctx.createLinearGradient(0, 0, 0, 320);
+        g.addColorStop(0, '#f4c44e');
+        g.addColorStop(0.5, '#e8ad35');
+        g.addColorStop(1, '#d19224');
+        ctx.fillStyle = g;
+        ctx.fillRect(6, 6, 116, 308);
+
+        ctx.strokeStyle = '#b51812';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(12, 12, 104, 296);
+
+        ctx.fillStyle = '#b51812';
+        [38, 64, 90].forEach(x => {
+          ctx.beginPath();
+          ctx.arc(x, 34, 7, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.font = '900 34px "Noto Serif TC", serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('敕令', 64, 84);
+
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(64, 98);
+        for (let y = 102; y < 255; y += 12) {
+          const amp = 28 * Math.sin((y - 100) * 0.08);
+          ctx.lineTo(64 + amp, y);
+        }
+        ctx.stroke();
+
+        ctx.font = '900 28px "Noto Serif TC", serif';
+        ctx.fillText('雷罡破', 64, 286);
+
+        return new THREE.CanvasTexture(cvs);
+      }
+
+      function createPlaqueTexture() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 512;
+        cvs.height = 160;
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle = '#1b0a07';
+        ctx.fillRect(0, 0, 512, 160);
+        ctx.strokeStyle = '#f3c354';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(10, 10, 492, 140);
+        ctx.fillStyle = '#ffd978';
+        ctx.font = '900 66px "Noto Serif TC", serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('凌霄天界殿', 256, 82);
+        return new THREE.CanvasTexture(cvs);
+      }
+
+      function createSmokeTexture() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 128;
+        cvs.height = 128;
+        const ctx = cvs.getContext('2d');
+        const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+        g.addColorStop(0, 'rgba(238, 232, 220, 0.55)');
+        g.addColorStop(0.45, 'rgba(210, 202, 190, 0.22)');
+        g.addColorStop(1, 'rgba(180, 175, 168, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 128, 128);
+        return new THREE.CanvasTexture(cvs);
+      }
+
+      function createJossEmberTexture() {
+        const cvs = document.createElement('canvas');
+        cvs.width = 128;
+        cvs.height = 128;
+        const ctx = cvs.getContext('2d');
+        ctx.clearRect(0, 0, 128, 128);
+
+        ctx.beginPath();
+        ctx.moveTo(22, 16);
+        ctx.lineTo(108, 24);
+        ctx.lineTo(114, 96);
+        ctx.lineTo(72, 114);
+        ctx.lineTo(16, 92);
+        ctx.closePath();
+
+        ctx.fillStyle = '#1f1917';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(222, 170, 68, 0.52)';
+        ctx.fillRect(45, 43, 36, 36);
+
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = '#ff6b1a';
+        ctx.shadowColor = '#ffaa2b';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+
+        return new THREE.CanvasTexture(cvs);
+      }
+
+      /* =========================================================
+       * 3. Three.js 閩南宮殿場景、燕尾翹脊神龕、雕龍石柱、香爐與動態道長
+       * ========================================================= */
+      const container = document.getElementById('canvas-wrap');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f0806);
+      scene.fog = new THREE.FogExp2(0x160b08, 0.022);
+
+      const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 130);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      container.appendChild(renderer.domElement);
+
+      const stoneTexLight = createStoneTexture(false);
+      const stoneTexDark = createStoneTexture(true);
+      const gildedWoodTex = createGildedWoodTexture();
+      const talismanTex = createTalismanTexture();
+      const smokeTex = createSmokeTexture();
+      const jossEmberTex = createJossEmberTexture();
+      const sharedEmberGeo = new THREE.PlaneGeometry(0.25, 0.29);
+
+      const MAT = {
+        redWood: new THREE.MeshStandardMaterial({
+          map: gildedWoodTex,
+          roughness: 0.36,
+          metalness: 0.18
+        }),
+        goldArmor: new THREE.MeshStandardMaterial({
+          color: 0xf6c453,
+          emissive: 0x3b2204,
+          roughness: 0.24,
+          metalness: 0.86
+        }),
+        blackStone: new THREE.MeshStandardMaterial({
+          map: stoneTexDark,
+          color: 0x465852,
+          roughness: 0.72,
+          metalness: 0.14
+        }),
+        jadeBronze: new THREE.MeshStandardMaterial({
+          color: 0x76b8a4,
+          emissive: 0x0b261f,
+          roughness: 0.38,
+          metalness: 0.55
+        }),
+        pillarStone: new THREE.MeshStandardMaterial({
+          map: stoneTexLight,
+          color: 0x5d6b66,
+          roughness: 0.78,
+          metalness: 0.12
+        }),
+        dragonRelief: new THREE.MeshStandardMaterial({
+          map: stoneTexLight,
+          color: 0x86968e,
+          emissive: 0x17130a,
+          roughness: 0.52,
+          metalness: 0.28
+        })
+      };
+
+      const hemiLight = new THREE.HemisphereLight(0xffdfad, 0x291712, 0.7);
+      scene.add(hemiLight);
+
+      const mainSpot = new THREE.DirectionalLight(0xffdfa8, 1.15);
+      mainSpot.position.set(5, 16, 8);
+      mainSpot.castShadow = true;
+      mainSpot.shadow.mapSize.width = 1024;
+      mainSpot.shadow.mapSize.height = 1024;
+      mainSpot.shadow.camera.near = 2;
+      mainSpot.shadow.camera.far = 35;
+      const dCam = 9.5;
+      mainSpot.shadow.camera.left = -dCam;
+      mainSpot.shadow.camera.right = dCam;
+      mainSpot.shadow.camera.top = dCam;
+      mainSpot.shadow.camera.bottom = -dCam;
+      scene.add(mainSpot);
+
+      const rimLight = new THREE.DirectionalLight(0x6bd4c0, 0.44);
+      rimLight.position.set(-7, 9, -10);
+      scene.add(rimLight);
+
+      const lanternLights = [];
+      const templeGroup = new THREE.Group();
+      scene.add(templeGroup);
+
+      function buildTempleArchitecture() {
+        // 閩南宮廟紅磚地面
+        const floor = new THREE.Mesh(
+          new THREE.PlaneGeometry(68, 68),
+          new THREE.MeshStandardMaterial({ color: 0x26110d, roughness: 0.85, metalness: 0.08 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -2.6;
+        floor.receiveShadow = true;
+        templeGroup.add(floor);
+
+        // 雕花紫檀神案供桌
+        const altarTop = new THREE.Mesh(
+          new THREE.BoxGeometry(11.2, 0.48, 12.2),
+          new THREE.MeshStandardMaterial({ color: 0x3b140d, roughness: 0.42, metalness: 0.15 })
+        );
+        altarTop.position.y = -0.02;
+        altarTop.receiveShadow = true;
+        templeGroup.add(altarTop);
+
+        const goldTrim = new THREE.Mesh(new THREE.BoxGeometry(11.42, 0.14, 12.42), MAT.goldArmor);
+        goldTrim.position.y = 0.12;
+        templeGroup.add(goldTrim);
+
+        const apron = new THREE.Mesh(
+          new THREE.BoxGeometry(10.2, 0.9, 11.2),
+          new THREE.MeshStandardMaterial({ color: 0x591710, roughness: 0.5 })
+        );
+        apron.position.y = -0.7;
+        templeGroup.add(apron);
+
+        [[-4.8, -5.2], [4.8, -5.2], [-4.8, 5.2], [4.8, 5.2]].forEach(([lx, lz]) => {
+          const leg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.36, 0.28, 2.4, 8),
+            new THREE.MeshStandardMaterial({ color: 0x33100a, roughness: 0.48 })
+          );
+          leg.position.set(lx, -1.4, lz);
+          templeGroup.add(leg);
+        });
+
+        // 棋盤表面
+        const boardMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(PLANE_W, PLANE_H),
+          new THREE.MeshStandardMaterial({
+            map: createBoardTexture(),
+            roughness: 0.34,
+            metalness: 0.12
+          })
+        );
+        boardMesh.rotation.x = -Math.PI / 2;
+        boardMesh.position.y = BOARD_Y;
+        boardMesh.receiveShadow = true;
+        templeGroup.add(boardMesh);
+
+        // 四根精雕「閩南蟠龍青斗石柱」
+        [
+          [-8.2, -8.8, 0.4],
+          [8.2, -8.8, -0.4],
+          [-8.6, 7.8, 2.4],
+          [8.6, 7.8, -2.4]
+        ].forEach(([px, pz, rotY]) => {
+          const pGroup = createDragonStonePillar();
+          pGroup.position.set(px, -2.6, pz);
+          pGroup.rotation.y = rotY;
+          templeGroup.add(pGroup);
+        });
+
+        // 北側閩南宮廟神龕牌樓、金匾「凌霄天界殿」與燕尾翹脊飛簷
+        const shrineGroup = new THREE.Group();
+        shrineGroup.position.set(0, -2.6, -11.6);
+
+        const backScreen = new THREE.Mesh(
+          new THREE.BoxGeometry(13.5, 8.8, 0.55),
+          new THREE.MeshStandardMaterial({ color: 0x45120c, roughness: 0.55 })
+        );
+        backScreen.position.y = 4.4;
+        shrineGroup.add(backScreen);
+
+        const plaque = new THREE.Mesh(
+          new THREE.BoxGeometry(4.6, 1.45, 0.22),
+          new THREE.MeshBasicMaterial({ map: createPlaqueTexture() })
+        );
+        plaque.position.set(0, 7.55, 0.38);
+        shrineGroup.add(plaque);
+
+        // 閩南燕尾翹脊屋頂曲線
+        const ridgeCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-8.8, 10.6, 0),
+          new THREE.Vector3(-4.5, 9.15, 0),
+          new THREE.Vector3(0, 8.85, 0),
+          new THREE.Vector3(4.5, 9.15, 0),
+          new THREE.Vector3(8.8, 10.6, 0)
+        ]);
+        const swallowtailRidge = new THREE.Mesh(
+          new THREE.TubeGeometry(ridgeCurve, 36, 0.28, 8, false),
+          MAT.goldArmor
+        );
+        shrineGroup.add(swallowtailRidge);
+        templeGroup.add(shrineGroup);
+
+        // 殿頂橫樑與八卦藻井穹頂
+        [-8.8, 7.8].forEach(bz => {
+          const beam = new THREE.Mesh(
+            new THREE.BoxGeometry(22, 0.65, 0.75),
+            new THREE.MeshStandardMaterial({ color: 0x5e150e, roughness: 0.55 })
+          );
+          beam.position.set(0, 8.2, bz);
+          templeGroup.add(beam);
+        });
+
+        const caissonRing = new THREE.Mesh(
+          new THREE.RingGeometry(2.6, 4.4, 8),
+          MAT.goldArmor
+        );
+        caissonRing.rotation.x = Math.PI / 2;
+        caissonRing.position.set(0, 9.4, -0.5);
+        templeGroup.add(caissonRing);
+
+        // 四盞閩南六角宮燈
+        [[-5.6, 6.6, -6.2], [5.6, 6.6, -6.2], [-6.2, 6.8, 5.4], [6.2, 6.8, 5.4]].forEach(([lx, ly, lz], idx) => {
+          const lGroup = new THREE.Group();
+          lGroup.position.set(lx, ly, lz);
+
+          const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.8, 6), MAT.goldArmor);
+          cord.position.y = 1.2;
+          lGroup.add(cord);
+
+          const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.55, 0.48, 1.25, 8),
+            new THREE.MeshStandardMaterial({
+              color: 0xd92b1c,
+              emissive: 0x9c1e0e,
+              emissiveIntensity: 0.85,
+              roughness: 0.4
+            })
+          );
+          lGroup.add(body);
+
+          const capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.62, 0.25, 8), MAT.goldArmor);
+          capTop.position.y = 0.72;
+          lGroup.add(capTop);
+
+          const capBot = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.22, 0.22, 8), MAT.goldArmor);
+          capBot.position.y = -0.72;
+          lGroup.add(capBot);
+
+          const tassel = new THREE.Mesh(
+            new THREE.ConeGeometry(0.12, 0.75, 6),
+            new THREE.MeshBasicMaterial({ color: 0xf5b841 })
+          );
+          tassel.rotation.x = Math.PI;
+          tassel.position.y = -1.18;
+          lGroup.add(tassel);
+
+          if (idx < 2) {
+            const pLight = new THREE.PointLight(0xff9d3b, 0.75, 18);
+            pLight.position.set(0, -0.2, 0);
+            lGroup.add(pLight);
+            lanternLights.push({ light: pLight, group: lGroup, phase: idx * 2.1 });
+          } else {
+            lanternLights.push({ light: null, group: lGroup, phase: idx * 1.7 });
+          }
+          templeGroup.add(lGroup);
+        });
+      }
+
+      function createDragonStonePillar() {
+        const g = new THREE.Group();
+
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.12, 0.85, 8), MAT.pillarStone);
+        base.position.y = 0.42;
+        g.add(base);
+
+        const lotusRing = new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.14, 8, 12), MAT.dragonRelief);
+        lotusRing.rotation.x = Math.PI / 2;
+        lotusRing.position.y = 0.88;
+        g.add(lotusRing);
+
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.74, 10.2, 12), MAT.pillarStone);
+        shaft.position.y = 5.8;
+        g.add(shaft);
+
+        const curvePts = [];
+        const turns = 2.35;
+        const segs = 42;
+        for (let i = 0; i <= segs; i++) {
+          const t = i / segs;
+          const ang = t * Math.PI * 2 * turns;
+          const rad = 0.82 + Math.sin(t * Math.PI * 6) * 0.04;
+          const py = 1.35 + t * 7.2;
+          curvePts.push(new THREE.Vector3(Math.cos(ang) * rad, py, Math.sin(ang) * rad));
+        }
+        const dragonCurve = new THREE.CatmullRomCurve3(curvePts);
+        const dragonBody = new THREE.Mesh(
+          new THREE.TubeGeometry(dragonCurve, 64, 0.21, 8, false),
+          MAT.dragonRelief
+        );
+        g.add(dragonBody);
+
+        for (let i = 2; i < segs; i += 2) {
+          const t = i / segs;
+          const pt = dragonCurve.getPointAt(t);
+          const fin = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 4), MAT.goldArmor);
+          fin.position.copy(pt);
+          const outward = new THREE.Vector3(pt.x, 0, pt.z).normalize();
+          fin.position.addScaledVector(outward, 0.18);
+          fin.lookAt(pt.x * 2, pt.y + 0.3, pt.z * 2);
+          g.add(fin);
+        }
+
+        const headPt = curvePts[curvePts.length - 1];
+        const headGroup = new THREE.Group();
+        headGroup.position.copy(headPt);
+        headGroup.lookAt(0, headPt.y - 0.5, 0);
+
+        const snout = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.62), MAT.dragonRelief);
+        headGroup.add(snout);
+        const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.52), MAT.pillarStone);
+        jaw.position.set(0, -0.2, 0.08);
+        jaw.rotation.x = 0.28;
+        headGroup.add(jaw);
+
+        [-0.16, 0.16].forEach(hx => {
+          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.55, 5), MAT.goldArmor);
+          horn.position.set(hx, 0.32, -0.15);
+          horn.rotation.x = -0.55;
+          headGroup.add(horn);
+        });
+
+        const pearl = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16, 12, 12),
+          new THREE.MeshBasicMaterial({ color: 0xffcf54 })
+        );
+        pearl.position.set(0, -0.06, 0.56);
+        headGroup.add(pearl);
+        g.add(headGroup);
+
+        const cap = new THREE.Mesh(
+          new THREE.BoxGeometry(1.9, 0.55, 1.9),
+          new THREE.MeshStandardMaterial({ color: 0x6b1911, roughness: 0.5 })
+        );
+        cap.position.y = 10.7;
+        g.add(cap);
+
+        return g;
+      }
+
+      const censerPositions = [
+        new THREE.Vector3(-5.05, BOARD_Y, -3.2),
+        new THREE.Vector3(5.05, BOARD_Y, 2.8)
+      ];
+      const smokeParticles = [];
+
+      function buildIncenseCensers() {
+        censerPositions.forEach((pos) => {
+          const cg = new THREE.Group();
+          cg.position.copy(pos);
+
+          const bowl = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.48, 0.36, 0.46, 14),
+            new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.52, metalness: 0.62 })
+          );
+          bowl.position.y = 0.26;
+          bowl.castShadow = true;
+          cg.add(bowl);
+
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.06, 8, 16), MAT.goldArmor);
+          rim.rotation.x = Math.PI / 2;
+          rim.position.y = 0.49;
+          cg.add(rim);
+
+          const ashBed = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.43, 0.43, 0.05, 12),
+            new THREE.MeshStandardMaterial({ color: 0xbdb7ad, roughness: 0.95 })
+          );
+          ashBed.position.y = 0.46;
+          cg.add(ashBed);
+
+          [-0.09, 0, 0.09].forEach((ix, idx) => {
+            const stick = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.014, 0.014, 0.85, 5),
+              new THREE.MeshBasicMaterial({ color: 0x8f2418 })
+            );
+            stick.position.set(ix, 0.85, (idx - 1) * 0.04);
+            stick.rotation.z = (idx - 1) * 0.06;
+            cg.add(stick);
+
+            const tip = new THREE.Mesh(
+              new THREE.SphereGeometry(0.028, 6, 6),
+              new THREE.MeshBasicMaterial({ color: 0xff5a14 })
+            );
+            tip.position.set(ix - (idx - 1) * 0.025, 1.28, (idx - 1) * 0.04);
+            cg.add(tip);
+          });
+
+          templeGroup.add(cg);
+
+          for (let i = 0; i < 18; i++) {
+            const spMat = new THREE.SpriteMaterial({
+              map: smokeTex,
+              color: 0xe8dfd1,
+              transparent: true,
+              opacity: 0.25,
+              depthWrite: false
+            });
+            const sp = new THREE.Sprite(spMat);
+            sp.userData = {
+              origin: new THREE.Vector3(pos.x, pos.y + 1.32, pos.z),
+              age: Math.random(),
+              speed: 0.14 + Math.random() * 0.06,
+              swirlPhase: Math.random() * Math.PI * 2
+            };
+            scene.add(sp);
+            smokeParticles.push(sp);
+          }
+        });
+      }
+
+      const daoistActor = {
+        group: new THREE.Group(),
+        head: null,
+        rightArm: null,
+        leftArm: null,
+        haloRing: null,
+        state: 'idle',
+        stateTimer: 0
+      };
+
+      function buildDaoistMasterAvatar() {
+        const dg = daoistActor.group;
+        dg.position.set(0, -0.35, -7.55);
+
+        const robe = new THREE.Mesh(
+          new THREE.ConeGeometry(1.35, 2.8, 10),
+          new THREE.MeshStandardMaterial({ color: 0x162436, roughness: 0.65, metalness: 0.15 })
+        );
+        robe.position.y = 1.25;
+        dg.add(robe);
+
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.11, 8, 12), MAT.goldArmor);
+        collar.rotation.x = Math.PI / 2;
+        collar.position.y = 2.32;
+        dg.add(collar);
+
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 2.85, 0);
+
+        const face = new THREE.Mesh(
+          new THREE.SphereGeometry(0.44, 14, 14),
+          new THREE.MeshStandardMaterial({ color: 0xdab48e, roughness: 0.65 })
+        );
+        headGroup.add(face);
+
+        const beard = new THREE.Mesh(
+          new THREE.ConeGeometry(0.24, 0.85, 6),
+          new THREE.MeshStandardMaterial({ color: 0xe6e4de, roughness: 0.8 })
+        );
+        beard.rotation.x = Math.PI;
+        beard.position.set(0, -0.48, 0.28);
+        headGroup.add(beard);
+
+        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.36, 0.42, 8), MAT.goldArmor);
+        crown.position.y = 0.46;
+        headGroup.add(crown);
+
+        dg.add(headGroup);
+        daoistActor.head = headGroup;
+
+        const rArm = new THREE.Group();
+        rArm.position.set(-0.95, 2.1, 0.25);
+        const rSleeve = new THREE.Mesh(
+          new THREE.ConeGeometry(0.32, 1.05, 8),
+          new THREE.MeshStandardMaterial({ color: 0x1d314a, roughness: 0.6 })
+        );
+        rSleeve.rotation.x = Math.PI / 2.4;
+        rArm.add(rSleeve);
+
+        const whiskHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), MAT.redWood);
+        whiskHandle.position.set(0, 0.25, 0.55);
+        whiskHandle.rotation.x = 0.5;
+        rArm.add(whiskHandle);
+
+        const whiskHair = new THREE.Mesh(
+          new THREE.ConeGeometry(0.16, 0.95, 8),
+          new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.85 })
+        );
+        whiskHair.position.set(0, 0.62, 0.88);
+        whiskHair.rotation.x = 0.9;
+        rArm.add(whiskHair);
+        dg.add(rArm);
+        daoistActor.rightArm = rArm;
+
+        const lArm = new THREE.Group();
+        lArm.position.set(0.95, 2.1, 0.25);
+        const lSleeve = new THREE.Mesh(
+          new THREE.ConeGeometry(0.32, 1.05, 8),
+          new THREE.MeshStandardMaterial({ color: 0x1d314a, roughness: 0.6 })
+        );
+        lSleeve.rotation.x = Math.PI / 2.4;
+        lArm.add(lSleeve);
+        dg.add(lArm);
+        daoistActor.leftArm = lArm;
+
+        const halo = new THREE.Mesh(
+          new THREE.RingGeometry(1.15, 1.32, 8),
+          new THREE.MeshBasicMaterial({
+            color: 0xf7c957,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.22
+          })
+        );
+        halo.position.set(0, 2.35, -0.55);
+        dg.add(halo);
+        daoistActor.haloRing = halo;
+
+        templeGroup.add(dg);
+      }
+
+      /* =========================================================
+       * 4. 精雕 3D「八將」與「天兵」神祇棋子生成（石雕 vs 鎏金木雕）
+       * ========================================================= */
+      let showFloatingBadges = true;
+      const badgeSprites = [];
+
+      function createPieceMesh(code) {
+        const info = PIECE_META[code];
+        const isRed = info.side === 'red';
+        const primaryMat = isRed ? MAT.redWood : MAT.blackStone;
+        const accentMat = isRed ? MAT.goldArmor : MAT.jadeBronze;
+
+        const root = new THREE.Group();
+
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.45, 0.22, 8), primaryMat);
+        base.position.y = 0.11;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        root.add(base);
+
+        const trimRing = new THREE.Mesh(new THREE.CylinderGeometry(0.425, 0.425, 0.05, 16), accentMat);
+        trimRing.position.y = 0.21;
+        root.add(trimRing);
+
+        const sealDisc = new THREE.Mesh(
+          new THREE.CircleGeometry(0.39, 24),
+          new THREE.MeshBasicMaterial({ map: getPieceSealTexture(code) })
+        );
+        sealDisc.rotation.x = -Math.PI / 2;
+        sealDisc.position.y = 0.242;
+        root.add(sealDisc);
+
+        const figure = new THREE.Group();
+        figure.position.set(0, 0.24, 0);
+        figure.rotation.y = isRed ? Math.PI : 0;
+
+        const role = info.role;
+        if (role === 'king') {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 0.56, 8), primaryMat);
+          body.position.y = 0.28;
+          body.castShadow = true;
+          figure.add(body);
+
+          const armor = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.18, 0.26, 8), accentMat);
+          armor.position.y = 0.42;
+          figure.add(armor);
+
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), primaryMat);
+          head.position.y = 0.66;
+          figure.add(head);
+
+          const crown = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.26, 6), accentMat);
+          crown.position.y = 0.86;
+          figure.add(crown);
+
+          const halo = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.032, 6, 16), accentMat);
+          halo.position.set(0, 0.64, -0.1);
+          figure.add(halo);
+
+          const sword = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.58, 0.06), accentMat);
+          sword.position.set(0.22, 0.48, 0.1);
+          sword.rotation.z = -0.25;
+          figure.add(sword);
+        } else if (role === 'advisor') {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.21, 0.48, 8), primaryMat);
+          body.position.y = 0.24;
+          body.castShadow = true;
+          figure.add(body);
+
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 10), primaryMat);
+          head.position.y = 0.56;
+          figure.add(head);
+
+          [-0.08, 0.08].forEach((fx, idx) => {
+            const plume = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.42, 5), accentMat);
+            plume.position.set(fx, 0.82, -0.05);
+            plume.rotation.z = idx === 0 ? 0.32 : -0.32;
+            plume.rotation.x = -0.2;
+            figure.add(plume);
+          });
+
+          const fan = new THREE.Mesh(new THREE.CircleGeometry(0.14, 7), accentMat);
+          fan.position.set(0.19, 0.42, 0.12);
+          figure.add(fan);
+        } else if (role === 'elephant') {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.24, 0.46, 8), primaryMat);
+          body.position.y = 0.23;
+          body.castShadow = true;
+          figure.add(body);
+
+          const sash = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 6, 10), accentMat);
+          sash.rotation.x = 1.2;
+          sash.position.y = 0.34;
+          figure.add(sash);
+
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), primaryMat);
+          head.position.y = 0.54;
+          figure.add(head);
+
+          const tallHat = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.36, 8), accentMat);
+          tallHat.position.y = 0.78;
+          figure.add(tallHat);
+        } else if (role === 'horse') {
+          const pedestalCloud = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 6, 10), accentMat);
+          pedestalCloud.rotation.x = Math.PI / 2;
+          pedestalCloud.position.y = 0.08;
+          figure.add(pedestalCloud);
+
+          const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.19, 0.38, 8), primaryMat);
+          chest.position.set(0, 0.24, -0.04);
+          chest.rotation.x = 0.35;
+          chest.castShadow = true;
+          figure.add(chest);
+
+          const neck = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.36, 0.22), primaryMat);
+          neck.position.set(0, 0.48, 0.06);
+          neck.rotation.x = -0.32;
+          figure.add(neck);
+
+          const snout = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.3), primaryMat);
+          snout.position.set(0, 0.62, 0.19);
+          snout.rotation.x = 0.35;
+          figure.add(snout);
+
+          const mane = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.38, 0.12), accentMat);
+          mane.position.set(0, 0.54, -0.05);
+          mane.rotation.x = -0.3;
+          figure.add(mane);
+        } else if (role === 'chariot') {
+          const carriage = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 0.38), primaryMat);
+          carriage.position.y = 0.24;
+          carriage.castShadow = true;
+          figure.add(carriage);
+
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.22, 4), accentMat);
+          roof.rotation.y = Math.PI / 4;
+          roof.position.y = 0.54;
+          figure.add(roof);
+
+          [-0.23, 0.23].forEach(wx => {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 12), accentMat);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(wx, 0.19, 0);
+            figure.add(wheel);
+          });
+        } else if (role === 'cannon') {
+          const mount = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.36), primaryMat);
+          mount.position.y = 0.12;
+          figure.add(mount);
+
+          const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.58, 12), accentMat);
+          barrel.position.set(0, 0.32, 0.04);
+          barrel.rotation.x = Math.PI / 3.1;
+          barrel.castShadow = true;
+          figure.add(barrel);
+
+          const muzzleRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 6, 12), primaryMat);
+          muzzleRing.position.set(0, 0.47, 0.28);
+          muzzleRing.rotation.x = Math.PI / 3.1;
+          figure.add(muzzleRing);
+        } else {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.19, 0.34, 8), primaryMat);
+          body.position.y = 0.18;
+          body.castShadow = true;
+          figure.add(body);
+
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), primaryMat);
+          head.position.y = 0.42;
+          figure.add(head);
+
+          const helmet = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.16, 8), accentMat);
+          helmet.position.y = 0.52;
+          figure.add(helmet);
+
+          const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.62, 5), accentMat);
+          spear.position.set(0.18, 0.36, 0.08);
+          figure.add(spear);
+        }
+
+        root.add(figure);
+
+        const spMat = new THREE.SpriteMaterial({
+          map: getPieceSealTexture(code),
+          transparent: true,
+          opacity: showFloatingBadges ? 0.94 : 0,
+          depthTest: true
+        });
+        const badge = new THREE.Sprite(spMat);
+        badge.scale.set(0.56, 0.56, 1);
+        badge.position.set(0, 1.18, 0);
+        root.add(badge);
+        badgeSprites.push(badge);
+
+        root.userData = { code, info, figure, badge };
+        return root;
+      }
+
+      /* =========================================================
+       * 5. 物理破碎系統、飛揚香灰與焚燒紙錢餘燼 + 武術劍氣與符咒交鋒動畫
+       * ========================================================= */
+      const activeShards = [];
+      const activeAsh = [];
+      const activeEmbers = [];
+      const activeSpellNodes = [];
+
+      function spawnPhysicalShatter(worldPos, victimCode) {
+        const info = PIECE_META[victimCode];
+        const isStone = info.side === 'black';
+
+        // 1) 28 塊精雕青斗石碎塊或鎏金紅木裂片
+        for (let i = 0; i < 28; i++) {
+          let geo;
+          let mat;
+          if (isStone) {
+            const r = 0.07 + Math.random() * 0.11;
+            geo = (i % 3 === 0)
+              ? new THREE.TetrahedronGeometry(r, 0)
+              : new THREE.DodecahedronGeometry(r, 0);
+            mat = (i % 5 === 0) ? MAT.jadeBronze : MAT.blackStone;
+          } else {
+            const sx = 0.05 + Math.random() * 0.08;
+            const sy = 0.14 + Math.random() * 0.22;
+            const sz = 0.04 + Math.random() * 0.07;
+            geo = new THREE.BoxGeometry(sx, sy, sz);
+            mat = (i % 3 === 0) ? MAT.goldArmor : MAT.redWood;
+          }
+
+          const mesh = new THREE.Mesh(geo, mat.clone());
+          mesh.material.transparent = true;
+          mesh.position.set(
+            worldPos.x + (Math.random() - 0.5) * 0.35,
+            worldPos.y + 0.22 + Math.random() * 0.55,
+            worldPos.z + (Math.random() - 0.5) * 0.35
+          );
+          mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+          mesh.castShadow = true;
+
+          const angle = Math.random() * Math.PI * 2;
+          const hSpeed = 1.6 + Math.random() * 4.4;
+          const vel = new THREE.Vector3(
+            Math.cos(angle) * hSpeed,
+            2.8 + Math.random() * 4.8,
+            Math.sin(angle) * hSpeed
+          );
+          const rotVel = new THREE.Vector3(
+            (Math.random() - 0.5) * 16,
+            (Math.random() - 0.5) * 16,
+            (Math.random() - 0.5) * 16
+          );
+
+          scene.add(mesh);
+          activeShards.push({
+            mesh,
+            vel,
+            rotVel,
+            life: 0,
+            maxLife: 2.3 + Math.random() * 0.8
+          });
+        }
+
+        // 2) 44 縷飛揚香灰微粒
+        for (let i = 0; i < 44; i++) {
+          const ashMat = new THREE.SpriteMaterial({
+            map: smokeTex,
+            color: i % 2 === 0 ? 0xd8d3c8 : 0xb5afa4,
+            transparent: true,
+            opacity: 0.8,
+            depthWrite: false
+          });
+          const sp = new THREE.Sprite(ashMat);
+          const sz = 0.13 + Math.random() * 0.25;
+          sp.scale.set(sz, sz, 1);
+          sp.position.set(
+            worldPos.x + (Math.random() - 0.5) * 0.5,
+            worldPos.y + 0.15 + Math.random() * 0.4,
+            worldPos.z + (Math.random() - 0.5) * 0.5
+          );
+          const ang = Math.random() * Math.PI * 2;
+          const spd = 0.6 + Math.random() * 2.5;
+          scene.add(sp);
+          activeAsh.push({
+            sprite: sp,
+            vel: new THREE.Vector3(Math.cos(ang) * spd, 0.9 + Math.random() * 2.2, Math.sin(ang) * spd),
+            phase: Math.random() * Math.PI * 2,
+            life: 0,
+            maxLife: 2.1 + Math.random() * 1.1
+          });
+        }
+
+        // 3) 34 片焚燒紙錢火紅餘燼殘片（共用幾何體零洩漏）
+        for (let i = 0; i < 34; i++) {
+          const eMat = new THREE.MeshBasicMaterial({
+            map: jossEmberTex,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false
+          });
+          const eMesh = new THREE.Mesh(sharedEmberGeo, eMat);
+          eMesh.position.set(
+            worldPos.x + (Math.random() - 0.5) * 0.65,
+            worldPos.y + 0.2 + Math.random() * 0.5,
+            worldPos.z + (Math.random() - 0.5) * 0.65
+          );
+          eMesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+          const ang = Math.random() * Math.PI * 2;
+          const rSpd = 0.5 + Math.random() * 2.0;
+          scene.add(eMesh);
+          activeEmbers.push({
+            mesh: eMesh,
+            vel: new THREE.Vector3(Math.cos(ang) * rSpd, 1.4 + Math.random() * 2.6, Math.sin(ang) * rSpd),
+            flutterSeed: Math.random() * 10,
+            life: 0,
+            maxLife: 2.5 + Math.random() * 1.2
+          });
+        }
+
+        // 地面破陣金火震波
+        const wave = new THREE.Mesh(
+          new THREE.RingGeometry(0.15, 0.38, 24),
+          new THREE.MeshBasicMaterial({
+            color: 0xffb838,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.92
+          })
+        );
+        wave.rotation.x = -Math.PI / 2;
+        wave.position.set(worldPos.x, BOARD_Y + 0.025, worldPos.z);
+        scene.add(wave);
+        activeSpellNodes.push({
+          mesh: wave,
+          disposeGeo: true,
+          kind: 'shockwave',
+          life: 0,
+          maxLife: 0.55
+        });
+      }
+
+      // 武術劍氣斬弧 + 道教五雷符咒與護體金鐘罩交鋒特效
+      function spawnTaoistTalismanFormation(targetPos, isAttackerStone) {
+        // 1) 八卦金陣底圈
+        const baguaCircle = new THREE.Mesh(
+          new THREE.RingGeometry(0.45, 0.68, 8),
+          new THREE.MeshBasicMaterial({
+            color: 0xffcf4d,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+          })
+        );
+        baguaCircle.rotation.x = -Math.PI / 2;
+        baguaCircle.position.set(targetPos.x, BOARD_Y + 0.02, targetPos.z);
+        scene.add(baguaCircle);
+        activeSpellNodes.push({
+          mesh: baguaCircle,
+          disposeGeo: true,
+          kind: 'bagua',
+          life: 0,
+          maxLife: 0.85
+        });
+
+        // 2) 受擊神將短暫撐起「護體符光罩」與攻方交鋒崩裂
+        const shieldDome = new THREE.Mesh(
+          new THREE.SphereGeometry(0.62, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
+          new THREE.MeshBasicMaterial({
+            color: isAttackerStone ? 0xffae42 : 0x5eead4,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.78
+          })
+        );
+        shieldDome.position.set(targetPos.x, BOARD_Y + 0.05, targetPos.z);
+        scene.add(shieldDome);
+        activeSpellNodes.push({
+          mesh: shieldDome,
+          disposeGeo: true,
+          kind: 'shield',
+          life: 0,
+          maxLife: 0.52
+        });
+
+        // 3) 武術凌空旋斬刀劍氣弧
+        const slashArc = new THREE.Mesh(
+          new THREE.TorusGeometry(0.85, 0.055, 6, 20, Math.PI * 1.25),
+          new THREE.MeshBasicMaterial({
+            color: isAttackerStone ? 0x6ee7b7 : 0xffd166,
+            transparent: true,
+            opacity: 0.95
+          })
+        );
+        slashArc.position.set(targetPos.x, targetPos.y + 0.95, targetPos.z);
+        slashArc.rotation.set(1.28, 0.2, 0.4);
+        scene.add(slashArc);
+        activeSpellNodes.push({
+          mesh: slashArc,
+          disposeGeo: true,
+          kind: 'slash',
+          life: 0,
+          maxLife: 0.56
+        });
+
+        // 4) 五方旋飛道教黃紙朱砂符咒
+        for (let i = 0; i < 5; i++) {
+          const tMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.28, 0.68),
+            new THREE.MeshBasicMaterial({
+              map: talismanTex,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.95
+            })
+          );
+          const baseAng = (i / 5) * Math.PI * 2;
+          tMesh.position.set(
+            targetPos.x + Math.cos(baseAng) * 1.15,
+            targetPos.y + 1.45,
+            targetPos.z + Math.sin(baseAng) * 1.15
+          );
+          scene.add(tMesh);
+          activeSpellNodes.push({
+            mesh: tMesh,
+            disposeGeo: true,
+            kind: 'talisman',
+            center: targetPos.clone(),
+            baseAng,
+            life: 0,
+            maxLife: 0.52
+          });
+        }
+
+        // 5) 天降五雷金光柱
+        const bolt = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.24, 5.5, 8, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: 0xffe484,
+            transparent: true,
+            opacity: 0.85,
+            side: THREE.DoubleSide
+          })
+        );
+        bolt.position.set(targetPos.x, targetPos.y + 2.75, targetPos.z);
+        scene.add(bolt);
+        activeSpellNodes.push({
+          mesh: bolt,
+          disposeGeo: true,
+          kind: 'lightning',
+          life: 0,
+          maxLife: 0.36
+        });
+      }
+
+      /* =========================================================
+       * 6. 完整中國象棋規則引擎 + 動態道長 Alpha-Beta 人工智慧
+       * ========================================================= */
+      const STANDARD_FEN_ROWS = [
+        ['r', 'n', 'b', 'a', 'k', 'a', 'b', 'n', 'r'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, 'c', null, null, null, null, null, 'c', null],
+        ['p', null, 'p', null, 'p', null, 'p', null, 'p'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null, null],
+        ['P', null, 'P', null, 'P', null, 'P', null, 'P'],
+        [null, 'C', null, null, null, null, null, 'C', null],
+        [null, null, null, null, null, null, null, null, null],
+        ['R', 'N', 'B', 'A', 'K', 'A', 'B', 'N', 'R']
+      ];
+
+      const CLASH_ENDGAME_ROWS = [
+        [null, null, 'b', 'a', 'k', 'a', null, null, 'r'],
+        [null, null, null, null, null, null, null, null, null],
+        [null, 'c', null, null, 'b', null, 'n', null, null],
+        ['p', null, 'p', null, 'P', null, null, 'C', 'p'],
+        [null, null, null, 'N', null, 'c', null, null, null],
+        [null, null, 'P', null, null, null, 'p', null, null],
+        ['P', null, null, null, 'P', null, null, null, 'P'],
+        [null, 'C', null, null, 'B', null, 'N', null, null],
+        [null, null, null, null, 'A', null, null, null, null],
+        ['R', null, 'B', 'A', 'K', null, null, 'R', null]
+      ];
+
+      let boardState = [];
+      let pieceObjects = [];
+      let moveHistory = [];
+      let currentTurn = 'red';
+      let selectedCell = null;
+      let validMovesForSelected = [];
+      let isAnimating = false;
+      let isGameOver = false;
+      let aiDifficulty = 2;
+      let openingMode = 'standard';
+      let capturedByRed = 0;
+      let capturedByBlack = 0;
+
+      function sideOfCode(code) {
+        if (!code) return null;
+        return code === code.toUpperCase() ? 'red' : 'black';
+      }
+
+      function extractGrid(state) {
+        const g = new Array(10);
+        for (let r = 0; r < 10; r++) {
+          g[r] = new Array(9);
+          for (let c = 0; c < 9; c++) {
+            g[r][c] = state[r][c] ? state[r][c].code : null;
+          }
+        }
+        return g;
+      }
+
+      function inBounds(r, c) {
+        return r >= 0 && r < 10 && c >= 0 && c < 9;
+      }
+
+      function inPalace(r, c, side) {
+        if (c < 3 || c > 5) return false;
+        return side === 'red' ? (r >= 7 && r <= 9) : (r >= 0 && r <= 2);
+      }
+
+      function getPseudoMovesOnGrid(grid, r, c) {
+        const code = grid[r][c];
+        if (!code) return [];
+        const side = sideOfCode(code);
+        const type = code.toLowerCase();
+        const moves = [];
+
+        const tryPush = (nr, nc) => {
+          if (!inBounds(nr, nc)) return;
+          const target = grid[nr][nc];
+          if (!target || sideOfCode(target) !== side) {
+            moves.push({ fr: r, fc: c, tr: nr, tc: nc, cap: target });
+          }
+        };
+
+        if (type === 'k') {
+          const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          for (let i = 0; i < 4; i++) {
+            const nr = r + dirs[i][0];
+            const nc = c + dirs[i][1];
+            if (inPalace(nr, nc, side)) tryPush(nr, nc);
+          }
+        } else if (type === 'a') {
+          const dirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+          for (let i = 0; i < 4; i++) {
+            const nr = r + dirs[i][0];
+            const nc = c + dirs[i][1];
+            if (inPalace(nr, nc, side)) tryPush(nr, nc);
+          }
+        } else if (type === 'b') {
+          const dirs = [[-2, -2], [-2, 2], [2, -2], [2, 2]];
+          for (let i = 0; i < 4; i++) {
+            const nr = r + dirs[i][0];
+            const nc = c + dirs[i][1];
+            if (!inBounds(nr, nc)) continue;
+            if (side === 'red' && nr < 5) continue;
+            if (side === 'black' && nr > 4) continue;
+            const er = r + dirs[i][0] / 2;
+            const ec = c + dirs[i][1] / 2;
+            if (grid[er][ec] === null) tryPush(nr, nc);
+          }
+        } else if (type === 'n') {
+          const jumps = [
+            [-2, -1, -1, 0], [-2, 1, -1, 0],
+            [2, -1, 1, 0],   [2, 1, 1, 0],
+            [-1, -2, 0, -1], [1, -2, 0, -1],
+            [-1, 2, 0, 1],   [1, 2, 0, 1]
+          ];
+          for (let i = 0; i < 8; i++) {
+            const nr = r + jumps[i][0];
+            const nc = c + jumps[i][1];
+            const lr = r + jumps[i][2];
+            const lc = c + jumps[i][3];
+            if (inBounds(nr, nc) && grid[lr][lc] === null) {
+              tryPush(nr, nc);
+            }
+          }
+        } else if (type === 'r') {
+          const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          for (let d = 0; d < 4; d++) {
+            let nr = r + dirs[d][0];
+            let nc = c + dirs[d][1];
+            while (inBounds(nr, nc)) {
+              const target = grid[nr][nc];
+              if (!target) {
+                moves.push({ fr: r, fc: c, tr: nr, tc: nc, cap: null });
+              } else {
+                if (sideOfCode(target) !== side) {
+                  moves.push({ fr: r, fc: c, tr: nr, tc: nc, cap: target });
+                }
+                break;
+              }
+              nr += dirs[d][0];
+              nc += dirs[d][1];
+            }
+          }
+        } else if (type === 'c') {
+          const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          for (let d = 0; d < 4; d++) {
+            let nr = r + dirs[d][0];
+            let nc = c + dirs[d][1];
+            let jumped = false;
+            while (inBounds(nr, nc)) {
+              const target = grid[nr][nc];
+              if (!jumped) {
+                if (!target) {
+                  moves.push({ fr: r, fc: c, tr: nr, tc: nc, cap: null });
+                } else {
+                  jumped = true;
+                }
+              } else {
+                if (target) {
+                  if (sideOfCode(target) !== side) {
+                    moves.push({ fr: r, fc: c, tr: nr, tc: nc, cap: target });
+                  }
+                  break;
+                }
+              }
+              nr += dirs[d][0];
+              nc += dirs[d][1];
+            }
+          }
+        } else if (type === 'p') {
+          const forward = side === 'red' ? -1 : 1;
+          tryPush(r + forward, c);
+          const crossedRiver = side === 'red' ? (r <= 4) : (r >= 5);
+          if (crossedRiver) {
+            tryPush(r, c - 1);
+            tryPush(r, c + 1);
+          }
+        }
+        return moves;
+      }
+
+      function isKingInCheckOnGrid(grid, side) {
+        const myKingCode = side === 'red' ? 'K' : 'k';
+        const oppKingCode = side === 'red' ? 'k' : 'K';
+        let kr = -1, kc = -1, okr = -1, okc = -1;
+
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            const p = grid[r][c];
+            if (p === myKingCode) { kr = r; kc = c; }
+            else if (p === oppKingCode) { okr = r; okc = c; }
+          }
+        }
+        if (kr === -1) return true;
+
+        if (okr !== -1 && kc === okc) {
+          const minR = Math.min(kr, okr) + 1;
+          const maxR = Math.max(kr, okr) - 1;
+          let clear = true;
+          for (let rr = minR; rr <= maxR; rr++) {
+            if (grid[rr][kc] !== null) {
+              clear = false;
+              break;
+            }
+          }
+          if (clear) return true;
+        }
+
+        const oppSide = side === 'red' ? 'black' : 'red';
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            const p = grid[r][c];
+            if (p && sideOfCode(p) === oppSide) {
+              const pMoves = getPseudoMovesOnGrid(grid, r, c);
+              for (let i = 0; i < pMoves.length; i++) {
+                if (pMoves[i].tr === kr && pMoves[i].tc === kc) return true;
+              }
+            }
+          }
+        }
+        return false;
+      }
+
+      function getAllLegalMoves(grid, side) {
+        const legal = [];
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            const p = grid[r][c];
+            if (p && sideOfCode(p) === side) {
+              const pseudo = getPseudoMovesOnGrid(grid, r, c);
+              for (let i = 0; i < pseudo.length; i++) {
+                const mv = pseudo[i];
+                const savedFrom = grid[mv.fr][mv.fc];
+                const savedTo = grid[mv.tr][mv.tc];
+                grid[mv.tr][mv.tc] = savedFrom;
+                grid[mv.fr][mv.fc] = null;
+                const inCheck = isKingInCheckOnGrid(grid, side);
+                grid[mv.fr][mv.fc] = savedFrom;
+                grid[mv.tr][mv.tc] = savedTo;
+                if (!inCheck) legal.push(mv);
+              }
+            }
+          }
+        }
+        return legal;
+      }
+
+      function evaluateGrid(grid) {
+        let score = 0;
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            const code = grid[r][c];
+            if (!code) continue;
+            const info = PIECE_META[code];
+            let v = info.val;
+            const isBlack = info.side === 'black';
+            const role = info.role;
+
+            if (role === 'pawn') {
+              if (isBlack && r >= 5) {
+                v += 115 + (4 - Math.abs(c - 4)) * 18 + (r >= 7 ? 30 : 0);
+              } else if (!isBlack && r <= 4) {
+                v += 115 + (4 - Math.abs(c - 4)) * 18 + (r <= 2 ? 30 : 0);
+              }
+            } else if (role === 'cannon') {
+              if (c === 4) v += 35;
+            } else if (role === 'horse') {
+              const centerDist = Math.abs(c - 4) + Math.abs(r - 4.5);
+              v += Math.max(0, 42 - centerDist * 6);
+            } else if (role === 'chariot') {
+              if (c === 3 || c === 4 || c === 5) v += 25;
+              if ((isBlack && r >= 4) || (!isBlack && r <= 5)) v += 28;
+            }
+
+            score += isBlack ? v : -v;
+          }
+        }
+        return score;
+      }
+
+      function computeBestMove(grid, side, depth) {
+        const maximizing = (side === 'black');
+        const moves = getAllLegalMoves(grid, side);
+        if (moves.length === 0) return null;
+
+        moves.sort((a, b) => {
+          const va = a.cap ? PIECE_META[a.cap].val : 0;
+          const vb = b.cap ? PIECE_META[b.cap].val : 0;
+          return vb - va;
+        });
+
+        function alphaBeta(d, alpha, beta, isMax) {
+          if (d === 0) return evaluateGrid(grid);
+          const curSide = isMax ? 'black' : 'red';
+          const curMoves = getAllLegalMoves(grid, curSide);
+          if (curMoves.length === 0) {
+            return isMax ? (-19000 - d * 50) : (19000 + d * 50);
+          }
+
+          curMoves.sort((a, b) => {
+            const va = a.cap ? PIECE_META[a.cap].val : 0;
+            const vb = b.cap ? PIECE_META[b.cap].val : 0;
+            return vb - va;
+          });
+
+          if (isMax) {
+            let best = -Infinity;
+            for (let i = 0; i < curMoves.length; i++) {
+              const m = curMoves[i];
+              const sf = grid[m.fr][m.fc];
+              const st = grid[m.tr][m.tc];
+              grid[m.tr][m.tc] = sf;
+              grid[m.fr][m.fc] = null;
+              const val = alphaBeta(d - 1, alpha, beta, false);
+              grid[m.fr][m.fc] = sf;
+              grid[m.tr][m.tc] = st;
+              if (val > best) best = val;
+              if (best > alpha) alpha = best;
+              if (beta <= alpha) break;
+            }
+            return best;
+          } else {
+            let best = Infinity;
+            for (let i = 0; i < curMoves.length; i++) {
+              const m = curMoves[i];
+              const sf = grid[m.fr][m.fc];
+              const st = grid[m.tr][m.tc];
+              grid[m.tr][m.tc] = sf;
+              grid[m.fr][m.fc] = null;
+              const val = alphaBeta(d - 1, alpha, beta, true);
+              grid[m.fr][m.fc] = sf;
+              grid[m.tr][m.tc] = st;
+              if (val < best) best = val;
+              if (best < beta) beta = best;
+              if (beta <= alpha) break;
+            }
+            return best;
+          }
+        }
+
+        let bestMove = moves[0];
+        let bestVal = maximizing ? -Infinity : Infinity;
+        const jitter = (depth === 1) ? 55 : (depth === 2 ? 12 : 2);
+
+        for (let i = 0; i < moves.length; i++) {
+          const m = moves[i];
+          const sf = grid[m.fr][m.fc];
+          const st = grid[m.tr][m.tc];
+          grid[m.tr][m.tc] = sf;
+          grid[m.fr][m.fc] = null;
+          const rawVal = alphaBeta(depth - 1, -Infinity, Infinity, !maximizing);
+          const noisyVal = rawVal + (Math.random() - 0.5) * jitter;
+          grid[m.fr][m.fc] = sf;
+          grid[m.tr][m.tc] = st;
+
+          if (maximizing) {
+            if (noisyVal > bestVal) { bestVal = noisyVal; bestMove = m; }
+          } else {
+            if (noisyVal < bestVal) { bestVal = noisyVal; bestMove = m; }
+          }
+        }
+        return bestMove;
+      }
+
+      /* =========================================================
+       * 7. 棋盤視覺標記與精準雙層觸控定位（先檢測立體棋子，再檢測棋盤交叉點）
+       * ========================================================= */
+      const hitDiscs = [];
+      const hitGroup = new THREE.Group();
+      scene.add(hitGroup);
+
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const hd = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.5, 0.14, 12),
+            new THREE.MeshBasicMaterial({ visible: false })
+          );
+          hd.position.set(colToX(c), BOARD_Y + 0.07, rowToZ(r));
+          hd.userData = { r, c };
+          hitGroup.add(hd);
+          hitDiscs.push(hd);
+        }
+      }
+
+      const markerGroup = new THREE.Group();
+      scene.add(markerGroup);
+
+      const selectionHalo = new THREE.Mesh(
+        new THREE.RingGeometry(0.45, 0.56, 24),
+        new THREE.MeshBasicMaterial({ color: 0xffe066, side: THREE.DoubleSide, transparent: true, opacity: 0.95 })
+      );
+      selectionHalo.rotation.x = -Math.PI / 2;
+      selectionHalo.visible = false;
+      scene.add(selectionHalo);
+
+      const lastMoveRings = [0, 1].map(() => {
+        const m = new THREE.Mesh(
+          new THREE.RingGeometry(0.42, 0.48, 16),
+          new THREE.MeshBasicMaterial({ color: 0x62e3c8, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+        );
+        m.rotation.x = -Math.PI / 2;
+        m.visible = false;
+        scene.add(m);
+        return m;
+      });
+
+      const hintRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.46, 0.58, 8),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
+      );
+      hintRing.rotation.x = -Math.PI / 2;
+      hintRing.visible = false;
+      scene.add(hintRing);
+
+      function refreshMoveMarkers() {
+        while (markerGroup.children.length > 0) {
+          const ch = markerGroup.children.pop();
+          markerGroup.remove(ch);
+        }
+        if (!selectedCell) {
+          selectionHalo.visible = false;
+          return;
+        }
+        selectionHalo.position.set(colToX(selectedCell.c), BOARD_Y + 0.025, rowToZ(selectedCell.r));
+        selectionHalo.visible = true;
+
+        validMovesForSelected.forEach(mv => {
+          const isCap = Boolean(mv.cap);
+          const ring = new THREE.Mesh(
+            isCap
+              ? new THREE.RingGeometry(0.44, 0.57, 8)
+              : new THREE.CircleGeometry(0.18, 16),
+            new THREE.MeshBasicMaterial({
+              color: isCap ? 0xff4433 : 0xfad05a,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: isCap ? 0.92 : 0.82
+            })
+          );
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(colToX(mv.tc), BOARD_Y + 0.03, rowToZ(mv.tr));
+          markerGroup.add(ring);
+        });
+      }
+
+      /* =========================================================
+       * 8. 鏡頭控制系統（支援正上方俯視自由旋轉，動畫期間鎖定玩家視角絕不晃動）
+       * ========================================================= */
+      const CAM_PRESETS = [
+        { name: '殿堂視角', theta: 0, phi: 0.88, baseRadius: 14.6 },
+        { name: '上方俯視', theta: 0, phi: 0.14, baseRadius: 13.5 },
+        { name: '神案近景', theta: 0.22, phi: 1.08, baseRadius: 12.8 }
+      ];
+      let camPresetIdx = 0;
+
+      const camCtrl = {
+        theta: 0,
+        phi: 0.88,
+        baseRadius: 14.6,
+        targetTheta: 0,
+        targetPhi: 0.88,
+        targetBaseRadius: 14.6,
+        lookTarget: new THREE.Vector3(0, 0.4, 0.15),
+        desiredLook: new THREE.Vector3(0, 0.4, 0.15)
+      };
+
+      function getAspectAdjustedRadius(baseR) {
+        const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+        if (aspect < 0.92) {
+          const factor = Math.min(1.72, 0.94 / Math.max(aspect, 0.46));
+          return baseR * factor;
+        }
+        return baseR;
+      }
+
+      function applyCameraPreset(idx) {
+        camPresetIdx = idx % CAM_PRESETS.length;
+        const p = CAM_PRESETS[camPresetIdx];
+        camCtrl.targetTheta = p.theta;
+        camCtrl.targetPhi = p.phi;
+        camCtrl.targetBaseRadius = p.baseRadius;
+        camCtrl.desiredLook.set(0, 0.4, 0.15);
+        document.getElementById('cam-label').textContent = p.name;
+      }
+
+      if (window.innerWidth < 640) {
+        camCtrl.phi = 0.68;
+        camCtrl.targetPhi = 0.68;
+      }
+
+      /* =========================================================
+       * 9. 走子與電影質感武術符咒交鋒動畫控制器
+       * ========================================================= */
+      let moveAnim = null;
+
+      const DAOIST_QUOTES = {
+        opening: [
+          '「香煙通三界，雕龍鎮乾坤。施主執鎏金神將，請賜教！」',
+          '「閩南古殿風雲起，八將天兵列陣前，請落子。」'
+        ],
+        thinking: [
+          '「貧道掐指觀星，推演天罡步法……」',
+          '「且慢，容貧道拂塵一揮，洞察玄機……」',
+          '「香煙左旋，煞星暗動，此陣大有文章……」'
+        ],
+        aiMove: [
+          '「玄門石將聽令，踏罡步斗，落！」',
+          '「貧道布下青石護法，看施主如何拆解。」',
+          '「陰陽流轉，守中帶攻，請接招！」'
+        ],
+        aiCapture: [
+          '「急急如律令！五雷符起，震碎鎏金甲！」',
+          '「玄門八將顯聖，破陣斬將，敕！」',
+          '「風火雷霆交加，此子貧道收下了！」'
+        ],
+        playerCapture: [
+          '「好凌厲的鎏金劍氣！竟震碎貧道精雕青石將！」',
+          '「善哉！施主武學與符法兼備，不可小覷！」',
+          '「石碎香灰揚，施主此擊頗有大將之風！」'
+        ],
+        checkPlayer: [
+          '「⚡ 天雷鎖宮！施主當心，將軍！」',
+          '「⚡ 玄門劍指中宮，將軍！速護元帥！」'
+        ],
+        checkAI: [
+          '「咦！鎏金鋒芒直逼貧道帥座，好一招將軍！」',
+          '「竟敢犯吾北極玄壇，貧道速調八將護駕！」'
+        ]
+      };
+
+      function pickQuote(category) {
+        const arr = DAOIST_QUOTES[category] || DAOIST_QUOTES.aiMove;
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+
+      function setDaoistSpeech(text, icon) {
+        document.getElementById('daoist-speech').textContent = text;
+        if (icon) document.getElementById('daoist-state-icon').textContent = icon;
+      }
+
+      let calloutTimer = null;
+      function showCallout(text, durationMs) {
+        const el = document.getElementById('center-callout');
+        const box = document.getElementById('callout-box');
+        box.textContent = text;
+        el.classList.remove('opacity-0');
+        el.classList.add('opacity-100');
+        if (calloutTimer) clearTimeout(calloutTimer);
+        calloutTimer = setTimeout(() => {
+          el.classList.remove('opacity-100');
+          el.classList.add('opacity-0');
+        }, durationMs || 1800);
+      }
+
+      function updateTurnUI() {
+        const dot = document.getElementById('turn-dot');
+        const label = document.getElementById('turn-label');
+        document.getElementById('score-red').textContent = String(capturedByRed);
+        document.getElementById('score-black').textContent = String(capturedByBlack);
+
+        if (isGameOver) return;
+        if (currentTurn === 'red') {
+          dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]';
+          label.textContent = '陽界鎏金方・請落子';
+        } else {
+          dot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+          label.textContent = '玄門道長・掐指推演中…';
+        }
+      }
+
+      function executeMove(mv, isAI) {
+        const attacker = boardState[mv.fr][mv.fc];
+        if (!attacker) return;
+        const victim = boardState[mv.tr][mv.tc];
+
+        isAnimating = true;
+        selectedCell = null;
+        validMovesForSelected = [];
+        hintRing.visible = false;
+        refreshMoveMarkers();
+
+        moveHistory.push({
+          fr: mv.fr,
+          fc: mv.fc,
+          tr: mv.tr,
+          tc: mv.tc,
+          attackerCode: attacker.code,
+          victimCode: victim ? victim.code : null,
+          prevTurn: currentTurn,
+          prevCapRed: capturedByRed,
+          prevCapBlack: capturedByBlack
+        });
+
+        const startPos = new THREE.Vector3(colToX(mv.fc), BOARD_Y, rowToZ(mv.fr));
+        const endPos = new THREE.Vector3(colToX(mv.tc), BOARD_Y, rowToZ(mv.tr));
+
+        lastMoveRings[0].position.set(startPos.x, BOARD_Y + 0.018, startPos.z);
+        lastMoveRings[0].visible = true;
+        lastMoveRings[1].position.set(endPos.x, BOARD_Y + 0.018, endPos.z);
+        lastMoveRings[1].visible = true;
+
+        if (victim) {
+          SoundFX.playTalismanCast();
+          spawnTaoistTalismanFormation(endPos, attacker.info.side === 'black');
+          daoistActor.state = isAI ? 'cast' : 'shock';
+          daoistActor.stateTimer = 1.35;
+
+          moveAnim = {
+            piece: attacker,
+            victim,
+            mv,
+            isCapture: true,
+            isAI,
+            startPos,
+            endPos,
+            shattered: false,
+            elapsed: 0,
+            duration: 0.74
+          };
+        } else {
+          moveAnim = {
+            piece: attacker,
+            victim: null,
+            mv,
+            isCapture: false,
+            isAI,
+            startPos,
+            endPos,
+            shattered: false,
+            elapsed: 0,
+            duration: 0.34
+          };
+        }
+      }
+
+      function finalizeMoveAnimation(anim) {
+        const { piece, victim, mv, isCapture, isAI } = anim;
+
+        if (isCapture && victim && !anim.shattered) {
+          triggerVictimShatter(victim, anim.endPos);
+        }
+
+        boardState[mv.fr][mv.fc] = null;
+        boardState[mv.tr][mv.tc] = piece;
+        piece.r = mv.tr;
+        piece.c = mv.tc;
+        piece.mesh.position.set(anim.endPos.x, BOARD_Y, anim.endPos.z);
+        piece.mesh.rotation.set(0, 0, 0);
+
+        if (!isCapture) {
+          SoundFX.playMove(piece.info.side === 'black');
+        }
+
+        currentTurn = (currentTurn === 'red') ? 'black' : 'red';
+        const grid = extractGrid(boardState);
+        const legalNext = getAllLegalMoves(grid, currentTurn);
+        const inCheck = isKingInCheckOnGrid(grid, currentTurn);
+
+        if (legalNext.length === 0) {
+          isAnimating = false;
+          isGameOver = true;
+          SoundFX.playTempleBell();
+          const redWon = (currentTurn === 'black');
+          showGameOverModal(redWon, inCheck);
+          return;
+        }
+
+        if (inCheck) {
+          showCallout('⚡ 急急如律令・將軍！', 1900);
+          setDaoistSpeech(pickQuote(currentTurn === 'red' ? 'checkPlayer' : 'checkAI'), '⚡');
+        } else if (isCapture) {
+          const vInfo = PIECE_META[victim.code];
+          showCallout(`💥 神威破陣・擊碎【${vInfo.deity}】`, 1450);
+          setDaoistSpeech(pickQuote(isAI ? 'aiCapture' : 'playerCapture'), isAI ? '☯️' : '🔥');
+        } else if (isAI) {
+          setDaoistSpeech(pickQuote('aiMove'), '🧙‍♂️');
+        }
+
+        isAnimating = false;
+        updateTurnUI();
+
+        if (currentTurn === 'black' && !isGameOver) {
+          scheduleDaoistAIMove();
+        }
+      }
+
+      function triggerVictimShatter(victim, pos) {
+        SoundFX.playShatter(victim.info.side === 'black');
+        spawnPhysicalShatter(pos, victim.code);
+
+        if (victim.info.side === 'black') {
+          capturedByRed++;
+        } else {
+          capturedByBlack++;
+        }
+
+        scene.remove(victim.mesh);
+        const idx = pieceObjects.indexOf(victim);
+        if (idx !== -1) pieceObjects.splice(idx, 1);
+      }
+
+      let aiTimer = null;
+      function scheduleDaoistAIMove() {
+        isAnimating = true;
+        daoistActor.state = 'thinking';
+        daoistActor.stateTimer = 1.5;
+        setDaoistSpeech(pickQuote('thinking'), '🔮');
+        updateTurnUI();
+
+        if (aiTimer) clearTimeout(aiTimer);
+        aiTimer = setTimeout(() => {
+          if (isGameOver || currentTurn !== 'black') {
+            isAnimating = false;
+            return;
+          }
+          const grid = extractGrid(boardState);
+          const searchDepth = aiDifficulty === 1 ? 1 : (aiDifficulty === 2 ? 2 : 3);
+          const chosen = computeBestMove(grid, 'black', searchDepth);
+          if (chosen) {
+            executeMove(chosen, true);
+          } else {
+            isAnimating = false;
+          }
+        }, 360);
+      }
+
+      /* =========================================================
+       * 10. 棋局初始化、悔棋、靈籤指點與結算畫面
+       * ========================================================= */
+      function clearAllBoardPieces() {
+        pieceObjects.forEach(p => scene.remove(p.mesh));
+        pieceObjects = [];
+        badgeSprites.length = 0;
+        boardState = Array.from({ length: 10 }, () => Array(9).fill(null));
+      }
+
+      function spawnPieceAt(code, r, c) {
+        const mesh = createPieceMesh(code);
+        mesh.position.set(colToX(c), BOARD_Y, rowToZ(r));
+        scene.add(mesh);
+        const obj = { code, info: PIECE_META[code], r, c, mesh };
+        mesh.userData.pieceRef = obj;
+        boardState[r][c] = obj;
+        pieceObjects.push(obj);
+        return obj;
+      }
+
+      function initGame() {
+        if (aiTimer) clearTimeout(aiTimer);
+        moveAnim = null;
+        isAnimating = false;
+        isGameOver = false;
+        currentTurn = 'red';
+        selectedCell = null;
+        validMovesForSelected = [];
+        moveHistory = [];
+        capturedByRed = 0;
+        capturedByBlack = 0;
+
+        clearAllBoardPieces();
+
+        const template = openingMode === 'clash' ? CLASH_ENDGAME_ROWS : STANDARD_FEN_ROWS;
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            const code = template[r][c];
+            if (code) spawnPieceAt(code, r, c);
+          }
+        }
+
+        lastMoveRings[0].visible = false;
+        lastMoveRings[1].visible = false;
+        hintRing.visible = false;
+        refreshMoveMarkers();
+
+        document.getElementById('modal-gameover').classList.add('hidden');
+        document.getElementById('modal-gameover').classList.remove('flex');
+        document.getElementById('selected-piece-hint').textContent = '單指點選神將落子・拖曳旋轉殿堂・雙指縮放';
+        setDaoistSpeech(pickQuote('opening'), '🧙‍♂️');
+        updateTurnUI();
+      }
+
+      function undoLastRound() {
+        if (isAnimating || moveHistory.length === 0) return;
+        if (isGameOver) {
+          isGameOver = false;
+          document.getElementById('modal-gameover').classList.add('hidden');
+          document.getElementById('modal-gameover').classList.remove('flex');
+        }
+
+        const stepsToRevert = (currentTurn === 'red' && moveHistory.length >= 2) ? 2 : 1;
+        for (let s = 0; s < stepsToRevert; s++) {
+          const rec = moveHistory.pop();
+          if (!rec) break;
+          const movedObj = boardState[rec.tr][rec.tc];
+          if (movedObj) {
+            boardState[rec.tr][rec.tc] = null;
+            boardState[rec.fr][rec.fc] = movedObj;
+            movedObj.r = rec.fr;
+            movedObj.c = rec.fc;
+            movedObj.mesh.position.set(colToX(rec.fc), BOARD_Y, rowToZ(rec.fr));
+          }
+          if (rec.victimCode) {
+            spawnPieceAt(rec.victimCode, rec.tr, rec.tc);
+          }
+          currentTurn = rec.prevTurn;
+          capturedByRed = rec.prevCapRed;
+          capturedByBlack = rec.prevCapBlack;
+        }
+
+        selectedCell = null;
+        validMovesForSelected = [];
+        lastMoveRings[0].visible = false;
+        lastMoveRings[1].visible = false;
+        hintRing.visible = false;
+        refreshMoveMarkers();
+        SoundFX.playSelect();
+        setDaoistSpeech('「乾坤倒轉，時光回溯！施主請重新審局。」', '☯️');
+        updateTurnUI();
+      }
+
+      function requestDivineHint() {
+        if (isAnimating || isGameOver || currentTurn !== 'red') return;
+        const grid = extractGrid(boardState);
+        const best = computeBestMove(grid, 'red', 2);
+        if (!best) return;
+
+        selectedCell = { r: best.fr, c: best.fc };
+        const allLegal = getAllLegalMoves(grid, 'red');
+        validMovesForSelected = allLegal.filter(m => m.fr === best.fr && m.fc === best.fc);
+        refreshMoveMarkers();
+
+        hintRing.position.set(colToX(best.tc), BOARD_Y + 0.036, rowToZ(best.tr));
+        hintRing.visible = true;
+
+        const pInfo = PIECE_META[grid[best.fr][best.fc]];
+        SoundFX.playTempleBell();
+        document.getElementById('selected-piece-hint').textContent =
+          `🔮 靈籤指引：【${pInfo.kanji}・${pInfo.deity}】宜往藍光八卦陣位推進`;
+        setDaoistSpeech(`「天機洩露！籤詩云：調動【${pInfo.deity}】可破當下迷局。」`, '🔮');
+      }
+
+      function showGameOverModal(redWon, byCheckmate) {
+        const modal = document.getElementById('modal-gameover');
+        const icon = document.getElementById('gameover-icon');
+        const title = document.getElementById('gameover-title');
+        const desc = document.getElementById('gameover-desc');
+
+        if (redWon) {
+          icon.textContent = '🏆';
+          title.textContent = byCheckmate ? '五雷破陣・天界大捷' : '困斃石陣・陽界獲勝';
+          desc.textContent = '施主運籌帷幄，鎏金八將與護殿天兵勢如破竹！玄門道長稽首讚嘆：「善哉妙算！」';
+          setDaoistSpeech('「善哉！施主劍氣通神，貧道甘拜下風！」', '🙏');
+        } else {
+          icon.textContent = '☯️';
+          title.textContent = byCheckmate ? '玄門絕殺・道長得勝' : '陣勢受困・玄門獲勝';
+          desc.textContent = '道長拂塵輕揮，青斗石八將鎖定九宮。不妨重整鎏金旗鼓，再戰一局！';
+          setDaoistSpeech('「承讓！天罡石陣變化無窮，施主可願再戰？」', '🧙‍♂️');
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      /* =========================================================
+       * 11. 觸控與滑鼠互動（雙層光線投射確保任何視角點擊精準無誤）
+       * ========================================================= */
+      const raycaster = new THREE.Raycaster();
+      const pointerNDC = new THREE.Vector2();
+
+      let isPointerDown = false;
+      let pointerStartX = 0;
+      let pointerStartY = 0;
+      let lastDragX = 0;
+      let lastDragY = 0;
+      let totalDragDist = 0;
+      let pinchStartDist = 0;
+      let pinchStartRadius = 14.6;
+
+      function resolveCellFromRaycast() {
+        // 第一層：優先檢測 3D 神將雕像本體與頭頂靈印（低角度斜視點擊雕像也 100% 精準）
+        const pieceRoots = pieceObjects.map(p => p.mesh);
+        const pieceHits = raycaster.intersectObjects(pieceRoots, true);
+        if (pieceHits.length > 0) {
+          let node = pieceHits[0].object;
+          while (node && !node.userData.pieceRef) {
+            node = node.parent;
+          }
+          if (node && node.userData.pieceRef) {
+            return { r: node.userData.pieceRef.r, c: node.userData.pieceRef.c };
+          }
+        }
+
+        // 第二層：檢測棋盤平面 90 格感應圓盤
+        const discHits = raycaster.intersectObjects(hitDiscs, false);
+        if (discHits.length > 0) {
+          return discHits[0].object.userData;
+        }
+        return null;
+      }
+
+      function handleBoardTap(clientX, clientY) {
+        SoundFX.init();
+        if (isAnimating || isGameOver || currentTurn !== 'red') return;
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointerNDC, camera);
+
+        const cell = resolveCellFromRaycast();
+        if (!cell) return;
+
+        const { r, c } = cell;
+        const tappedPiece = boardState[r][c];
+
+        if (selectedCell) {
+          const matchedMove = validMovesForSelected.find(m => m.tr === r && m.tc === c);
+          if (matchedMove) {
+            executeMove(matchedMove, false);
+            return;
+          }
+        }
+
+        if (tappedPiece && tappedPiece.info.side === 'red') {
+          SoundFX.playSelect();
+          selectedCell = { r, c };
+          const grid = extractGrid(boardState);
+          const allLegal = getAllLegalMoves(grid, 'red');
+          validMovesForSelected = allLegal.filter(m => m.fr === r && m.fc === c);
+          hintRing.visible = false;
+          refreshMoveMarkers();
+
+          document.getElementById('selected-piece-hint').textContent =
+            `已敕選【${tappedPiece.info.kanji}・${tappedPiece.info.deity}】— 可行 ${validMovesForSelected.length} 處陣位`;
+        } else {
+          selectedCell = null;
+          validMovesForSelected = [];
+          refreshMoveMarkers();
+          document.getElementById('selected-piece-hint').textContent =
+            '單指點選神將落子・拖曳旋轉殿堂・雙指縮放';
+        }
+      }
+
+      const domEl = renderer.domElement;
+
+      domEl.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch' && !e.isPrimary) return;
+        isPointerDown = true;
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+        lastDragX = e.clientX;
+        lastDragY = e.clientY;
+        totalDragDist = 0;
+      });
+
+      domEl.addEventListener('pointermove', (e) => {
+        if (!isPointerDown || pinchStartDist > 0) return;
+        const dx = e.clientX - lastDragX;
+        const dy = e.clientY - lastDragY;
+        lastDragX = e.clientX;
+        lastDragY = e.clientY;
+        totalDragDist += Math.hypot(dx, dy);
+
+        if (totalDragDist > 10) {
+          camCtrl.targetTheta -= dx * 0.0065;
+          camCtrl.targetPhi = Math.max(0.06, Math.min(1.28, camCtrl.targetPhi - dy * 0.0055));
+        }
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        if (!isPointerDown) return;
+        isPointerDown = false;
+        if (totalDragDist < 12 && pinchStartDist === 0) {
+          const distFromStart = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+          if (distFromStart < 14 && e.target === domEl) {
+            handleBoardTap(e.clientX, e.clientY);
+          }
+        }
+      });
+
+      domEl.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          pinchStartDist = Math.hypot(dx, dy);
+          pinchStartRadius = camCtrl.targetBaseRadius;
+        }
+      }, { passive: true });
+
+      domEl.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && pinchStartDist > 0) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          const ratio = pinchStartDist / Math.max(dist, 20);
+          camCtrl.targetBaseRadius = Math.max(8.5, Math.min(20.5, pinchStartRadius * ratio));
+        }
+      }, { passive: true });
+
+      domEl.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+          setTimeout(() => { pinchStartDist = 0; }, 80);
+        }
+      }, { passive: true });
+
+      domEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camCtrl.targetBaseRadius = Math.max(8.5, Math.min(20.5, camCtrl.targetBaseRadius + e.deltaY * 0.01));
+      }, { passive: false });
+
+      /* =========================================================
+       * 12. UI 按鈕事件綁定
+       * ========================================================= */
+      document.getElementById('btn-sound').addEventListener('click', () => {
+        SoundFX.enabled = !SoundFX.enabled;
+        document.getElementById('sound-icon').textContent = SoundFX.enabled ? '🔊' : '🔇';
+        if (SoundFX.enabled) SoundFX.playSelect();
+      });
+
+      document.getElementById('btn-cam').addEventListener('click', () => {
+        SoundFX.playSelect();
+        applyCameraPreset(camPresetIdx + 1);
+      });
+
+      document.getElementById('btn-hint').addEventListener('click', () => {
+        requestDivineHint();
+      });
+
+      document.getElementById('btn-undo').addEventListener('click', () => {
+        undoLastRound();
+      });
+
+      document.getElementById('btn-restart').addEventListener('click', () => {
+        SoundFX.playTempleBell();
+        initGame();
+      });
+
+      const loreModal = document.getElementById('modal-lore');
+      const closeLore = () => {
+        loreModal.classList.add('hidden');
+        loreModal.classList.remove('flex');
+      };
+      document.getElementById('btn-lore').addEventListener('click', () => {
+        SoundFX.playSelect();
+        loreModal.classList.remove('hidden');
+        loreModal.classList.add('flex');
+      });
+      document.getElementById('btn-close-lore').addEventListener('click', closeLore);
+      document.getElementById('btn-ok-lore').addEventListener('click', closeLore);
+
+      const settingsModal = document.getElementById('modal-settings');
+      const closeSettings = () => {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+      };
+      document.getElementById('btn-settings').addEventListener('click', () => {
+        SoundFX.playSelect();
+        settingsModal.classList.remove('hidden');
+        settingsModal.classList.add('flex');
+      });
+      document.getElementById('btn-close-settings').addEventListener('click', closeSettings);
+      document.getElementById('btn-ok-settings').addEventListener('click', closeSettings);
+
+      const diffNames = { 1: '小道童', 2: '護法道長', 3: '天師真人' };
+      [1, 2, 3].forEach(lvl => {
+        document.getElementById('diff-' + lvl).addEventListener('click', () => {
+          aiDifficulty = lvl;
+          SoundFX.playSelect();
+          document.getElementById('ai-badge-short').textContent = diffNames[lvl];
+          [1, 2, 3].forEach(k => {
+            const btn = document.getElementById('diff-' + k);
+            if (k === lvl) btn.classList.add('gold-btn-primary');
+            else btn.classList.remove('gold-btn-primary');
+          });
+          setDaoistSpeech(`「境界已調為【${diffNames[lvl]}】，貧道領教！」`, '☯️');
+        });
+      });
+
+      document.getElementById('mode-standard').addEventListener('click', () => {
+        openingMode = 'standard';
+        document.getElementById('mode-standard').classList.add('gold-btn-primary');
+        document.getElementById('mode-clash').classList.remove('gold-btn-primary');
+        SoundFX.playTempleBell();
+        initGame();
+        closeSettings();
+      });
+
+      document.getElementById('mode-clash').addEventListener('click', () => {
+        openingMode = 'clash';
+        document.getElementById('mode-clash').classList.add('gold-btn-primary');
+        document.getElementById('mode-standard').classList.remove('gold-btn-primary');
+        SoundFX.playTempleBell();
+        initGame();
+        closeSettings();
+      });
+
+      document.getElementById('btn-toggle-badges').addEventListener('click', (e) => {
+        showFloatingBadges = !showFloatingBadges;
+        const btn = e.currentTarget;
+        btn.textContent = showFloatingBadges ? '已開啟' : '已關閉';
+        btn.classList.toggle('gold-btn-primary', showFloatingBadges);
+        badgeSprites.forEach(sp => {
+          sp.material.opacity = showFloatingBadges ? 0.94 : 0;
+        });
+        SoundFX.playSelect();
+      });
+
+      document.getElementById('btn-gameover-review').addEventListener('click', () => {
+        document.getElementById('modal-gameover').classList.add('hidden');
+        document.getElementById('modal-gameover').classList.remove('flex');
+      });
+      document.getElementById('btn-gameover-restart').addEventListener('click', () => {
+        SoundFX.playTempleBell();
+        initGame();
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      /* =========================================================
+       * 13. 主渲染與物理模擬迴圈 (60 FPS)
+       * ========================================================= */
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const elapsed = clock.getElapsedTime();
+
+        lanternLights.forEach(item => {
+          item.group.rotation.z = Math.sin(elapsed * 1.3 + item.phase) * 0.035;
+          if (item.light) {
+            item.light.intensity = 0.72 + Math.sin(elapsed * 5.2 + item.phase) * 0.1;
+          }
+        });
+
+        for (let i = 0; i < smokeParticles.length; i++) {
+          const sp = smokeParticles[i];
+          const u = sp.userData;
+          u.age += dt * u.speed;
+          if (u.age >= 1) u.age = 0;
+
+          const h = u.age * 5.6;
+          const driftX = Math.sin(u.age * 5.5 + elapsed * 0.8 + u.swirlPhase) * (0.28 * u.age + 0.04);
+          const driftZ = Math.cos(u.age * 4.2 + elapsed * 0.6 + u.swirlPhase) * (0.24 * u.age + 0.04);
+          sp.position.set(u.origin.x + driftX, u.origin.y + h, u.origin.z + driftZ);
+
+          const scale = 0.25 + u.age * 1.45;
+          sp.scale.set(scale, scale, 1);
+          sp.material.opacity = Math.sin(u.age * Math.PI) * 0.22;
+        }
+
+        if (daoistActor.stateTimer > 0) {
+          daoistActor.stateTimer -= dt;
+          if (daoistActor.stateTimer <= 0) daoistActor.state = 'idle';
+        }
+        if (daoistActor.head) {
+          if (daoistActor.state === 'thinking') {
+            daoistActor.haloRing.rotation.z += dt * 2.8;
+            daoistActor.haloRing.material.opacity = 0.75;
+            daoistActor.leftArm.rotation.x = -0.65 + Math.sin(elapsed * 8) * 0.12;
+            daoistActor.rightArm.rotation.z = Math.sin(elapsed * 4) * 0.18;
+          } else if (daoistActor.state === 'cast') {
+            daoistActor.haloRing.rotation.z += dt * 5.0;
+            daoistActor.haloRing.material.opacity = 0.92;
+            daoistActor.rightArm.rotation.x = -0.85;
+            daoistActor.leftArm.rotation.x = -0.85;
+          } else if (daoistActor.state === 'shock') {
+            daoistActor.head.rotation.x = -0.18;
+            daoistActor.rightArm.rotation.z = -0.35;
+            daoistActor.haloRing.material.opacity = 0.35;
+          } else {
+            daoistActor.haloRing.rotation.z += dt * 0.45;
+            daoistActor.haloRing.material.opacity = 0.22;
+            daoistActor.head.rotation.y = Math.sin(elapsed * 0.9) * 0.12;
+            daoistActor.head.rotation.x = Math.sin(elapsed * 1.5) * 0.04;
+            daoistActor.rightArm.rotation.x *= 0.9;
+            daoistActor.rightArm.rotation.z = Math.sin(elapsed * 1.4) * 0.08;
+            daoistActor.leftArm.rotation.x *= 0.9;
+          }
+        }
+
+        if (moveAnim) {
+          moveAnim.elapsed += dt;
+          const t = Math.min(moveAnim.elapsed / moveAnim.duration, 1);
+          const mesh = moveAnim.piece.mesh;
+
+          if (moveAnim.isCapture) {
+            const ease = t < 0.62
+              ? (t / 0.62) * 0.78
+              : 0.78 + ((t - 0.62) / 0.38) * 0.22;
+
+            mesh.position.lerpVectors(moveAnim.startPos, moveAnim.endPos, ease);
+            const jumpArc = t < 0.62
+              ? Math.sin((t / 0.62) * (Math.PI * 0.65)) * 2.85
+              : Math.cos(((t - 0.62) / 0.38) * (Math.PI * 0.5)) * 2.52;
+            mesh.position.y = BOARD_Y + Math.max(0, jumpArc);
+
+            mesh.rotation.y = t * Math.PI * 4;
+            mesh.rotation.x = Math.sin(t * Math.PI) * 0.38;
+
+            if (t >= 0.72 && !moveAnim.shattered && moveAnim.victim) {
+              moveAnim.shattered = true;
+              triggerVictimShatter(moveAnim.victim, moveAnim.endPos);
+            }
+          } else {
+            const smooth = t * t * (3 - 2 * t);
+            mesh.position.lerpVectors(moveAnim.startPos, moveAnim.endPos, smooth);
+            mesh.position.y = BOARD_Y + Math.sin(t * Math.PI) * 0.85;
+          }
+
+          if (t >= 1) {
+            const finished = moveAnim;
+            moveAnim = null;
+            finalizeMoveAnimation(finished);
+          }
+        }
+
+        if (selectionHalo.visible) {
+          selectionHalo.rotation.z = elapsed * 1.8;
+          const s = 1 + Math.sin(elapsed * 5) * 0.06;
+          selectionHalo.scale.set(s, s, 1);
+        }
+        if (hintRing.visible) {
+          hintRing.rotation.z = -elapsed * 2.4;
+          const hs = 1 + Math.sin(elapsed * 6.5) * 0.1;
+          hintRing.scale.set(hs, hs, 1);
+        }
+
+        for (let i = activeShards.length - 1; i >= 0; i--) {
+          const sh = activeShards[i];
+          sh.life += dt;
+          if (sh.life >= sh.maxLife) {
+            scene.remove(sh.mesh);
+            sh.mesh.geometry.dispose();
+            sh.mesh.material.dispose();
+            activeShards.splice(i, 1);
+            continue;
+          }
+
+          sh.vel.y -= 22.5 * dt;
+          sh.mesh.position.addScaledVector(sh.vel, dt);
+          sh.mesh.rotation.x += sh.rotVel.x * dt;
+          sh.mesh.rotation.y += sh.rotVel.y * dt;
+          sh.mesh.rotation.z += sh.rotVel.z * dt;
+
+          const inAltarBounds = Math.abs(sh.mesh.position.x) < 5.5 && Math.abs(sh.mesh.position.z) < 6.0;
+          const surfaceY = inAltarBounds ? (BOARD_Y + 0.05) : -2.52;
+          if (sh.mesh.position.y < surfaceY) {
+            sh.mesh.position.y = surfaceY;
+            sh.vel.y = Math.abs(sh.vel.y) * 0.42;
+            sh.vel.x *= 0.74;
+            sh.vel.z *= 0.74;
+            sh.rotVel.multiplyScalar(0.68);
+          }
+
+          if (sh.life > sh.maxLife * 0.65) {
+            const fade = 1 - (sh.life - sh.maxLife * 0.65) / (sh.maxLife * 0.35);
+            sh.mesh.material.opacity = Math.max(0, fade);
+          }
+        }
+
+        for (let i = activeAsh.length - 1; i >= 0; i--) {
+          const a = activeAsh[i];
+          a.life += dt;
+          if (a.life >= a.maxLife) {
+            scene.remove(a.sprite);
+            a.sprite.material.dispose();
+            activeAsh.splice(i, 1);
+            continue;
+          }
+          a.vel.x *= 0.96;
+          a.vel.z *= 0.96;
+          a.vel.y += (0.55 - a.vel.y) * dt * 1.5;
+          a.sprite.position.addScaledVector(a.vel, dt);
+          a.sprite.position.x += Math.sin(elapsed * 4 + a.phase) * 0.35 * dt;
+          a.sprite.material.opacity = (1 - a.life / a.maxLife) * 0.75;
+        }
+
+        for (let i = activeEmbers.length - 1; i >= 0; i--) {
+          const em = activeEmbers[i];
+          em.life += dt;
+          if (em.life >= em.maxLife) {
+            scene.remove(em.mesh);
+            em.mesh.material.dispose();
+            activeEmbers.splice(i, 1);
+            continue;
+          }
+          em.vel.x *= 0.97;
+          em.vel.z *= 0.97;
+          em.vel.y += (1.15 - em.vel.y) * dt * 1.8;
+          em.mesh.position.addScaledVector(em.vel, dt);
+          em.mesh.position.x += Math.sin(elapsed * 5.2 + em.flutterSeed) * 0.65 * dt;
+          em.mesh.position.z += Math.cos(elapsed * 4.6 + em.flutterSeed) * 0.65 * dt;
+          em.mesh.rotation.x += dt * 4.2;
+          em.mesh.rotation.y += dt * 5.5;
+          em.mesh.material.opacity = Math.max(0, 1 - Math.pow(em.life / em.maxLife, 1.4));
+        }
+
+        for (let i = activeSpellNodes.length - 1; i >= 0; i--) {
+          const sn = activeSpellNodes[i];
+          sn.life += dt;
+          const p = sn.life / sn.maxLife;
+          if (p >= 1) {
+            scene.remove(sn.mesh);
+            if (sn.disposeGeo && sn.mesh.geometry) sn.mesh.geometry.dispose();
+            if (sn.mesh.material) sn.mesh.material.dispose();
+            activeSpellNodes.splice(i, 1);
+            continue;
+          }
+
+          if (sn.kind === 'talisman') {
+            const ang = sn.baseAng + sn.life * 9.5;
+            const rad = 1.25 * (1 - p * 0.82);
+            sn.mesh.position.set(
+              sn.center.x + Math.cos(ang) * rad,
+              sn.center.y + 1.5 * (1 - p * 0.65),
+              sn.center.z + Math.sin(ang) * rad
+            );
+            sn.mesh.lookAt(sn.center.x, sn.center.y + 3.4, sn.center.z);
+            sn.mesh.material.opacity = 1 - p * 0.5;
+          } else if (sn.kind === 'bagua') {
+            sn.mesh.rotation.z += dt * 6.5;
+            const bs = 1 + p * 1.35;
+            sn.mesh.scale.set(bs, bs, 1);
+            sn.mesh.material.opacity = (1 - p) * 0.9;
+          } else if (sn.kind === 'shield') {
+            const ss = 1 + p * 0.45;
+            sn.mesh.scale.set(ss, ss, ss);
+            sn.mesh.rotation.y += dt * 5;
+            sn.mesh.material.opacity = (1 - p) * 0.85;
+          } else if (sn.kind === 'slash') {
+            sn.mesh.rotation.z += dt * 16;
+            const sl = 0.8 + p * 0.9;
+            sn.mesh.scale.set(sl, sl, sl);
+            sn.mesh.position.y -= dt * 1.1;
+            sn.mesh.material.opacity = (1 - p) * 0.95;
+          } else if (sn.kind === 'shockwave') {
+            const ws = 1 + p * 5.2;
+            sn.mesh.scale.set(ws, ws, 1);
+            sn.mesh.material.opacity = (1 - p) * 0.9;
+          } else if (sn.kind === 'lightning') {
+            sn.mesh.material.opacity = (1 - p) * (0.65 + Math.random() * 0.35);
+            sn.mesh.scale.x = 1 - p * 0.6;
+            sn.mesh.scale.z = 1 - p * 0.6;
+          }
+        }
+
+        camCtrl.theta += (camCtrl.targetTheta - camCtrl.theta) * Math.min(1, dt * 7);
+        camCtrl.phi += (camCtrl.targetPhi - camCtrl.phi) * Math.min(1, dt * 7);
+        camCtrl.baseRadius += (camCtrl.targetBaseRadius - camCtrl.baseRadius) * Math.min(1, dt * 7);
+        camCtrl.lookTarget.lerp(camCtrl.desiredLook, Math.min(1, dt * 7));
+
+        const effRadius = getAspectAdjustedRadius(camCtrl.baseRadius);
+        const cx = camCtrl.lookTarget.x + effRadius * Math.sin(camCtrl.phi) * Math.sin(camCtrl.theta);
+        const cy = camCtrl.lookTarget.y + effRadius * Math.cos(camCtrl.phi);
+        const cz = camCtrl.lookTarget.z + effRadius * Math.sin(camCtrl.phi) * Math.cos(camCtrl.theta);
+
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(camCtrl.lookTarget);
+
+        renderer.render(scene, camera);
+      }
+
+      /* =========================================================
+       * 14. 啟動殿堂與天界棋局
+       * ========================================================= */
+      window.addEventListener('load', () => {
+        buildTempleArchitecture();
+        buildIncenseCensers();
+        buildDaoistMasterAvatar();
+        initGame();
+        animate();
+      });
+    })();
+  </script>
+</body>
+</html>
